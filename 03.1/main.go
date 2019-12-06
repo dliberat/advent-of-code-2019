@@ -1,4 +1,4 @@
-/*  https://adventofcode.com/2019/day/3  */
+/*https://adventofcode.com/2019/day/3*/
 
 package main
 
@@ -19,6 +19,22 @@ type step struct {
 type coord struct {
 	x int
 	y int
+}
+
+func (s *step) print() {
+	var dir string
+
+	if s.dir == 82 {
+		dir = "R"
+	} else if s.dir == 68 {
+		dir = "D"
+	} else if s.dir == 85 {
+		dir = "U"
+	} else {
+		dir = "L"
+	}
+
+	fmt.Println(dir, s.dist)
 }
 
 func (c *coord) equals(other *coord) bool {
@@ -83,29 +99,56 @@ func getRoute(input string) map[string]bool {
 
 	var nextX int
 	var nextY int
+	var sign int
 
 	for _, v := range steps {
 
 		if v.dir == 85 { // up
 			nextX = currentpos.x
 			nextY = currentpos.y + v.dist
+			sign = 1
 		} else if v.dir == 68 { // down
 			nextX = currentpos.x
 			nextY = currentpos.y - v.dist
+			sign = -1
 		} else if v.dir == 76 { // left
 			nextX = currentpos.x - v.dist
 			nextY = currentpos.y
+			sign = -1
 		} else if v.dir == 82 { // right
 			nextX = currentpos.x + v.dist
 			nextY = currentpos.y
+			sign = 1
 		} else {
 			fmt.Println("Unexpected direction: ", v.dir)
 		}
 
-		for q := currentpos.x; q <= nextX; q++ {
-			for p := currentpos.y; p <= nextY; p++ {
-				pos := fmt.Sprintf("%v,%v", q, p)
-				route[pos] = true
+		if sign == 1 {
+			for q := currentpos.x; q <= nextX; q++ {
+				for p := currentpos.y; p <= nextY; p++ {
+
+					if q == currentpos.x && p == currentpos.y {
+						continue
+					}
+
+					pos := fmt.Sprintf("%v,%v", q, p)
+					fmt.Println("inserting ", q, p)
+					route[pos] = true
+				}
+			}
+
+		} else {
+
+			for q := currentpos.x; q >= nextX; q-- {
+				for p := currentpos.y; p >= nextY; p-- {
+
+					if q == currentpos.x && p == currentpos.y {
+						continue
+					}
+
+					pos := fmt.Sprintf("%v,%v", q, p)
+					route[pos] = true
+				}
 			}
 		}
 
@@ -160,6 +203,7 @@ func main() {
 	// minimum manhattan distance from 0,0 in the set of intersections
 	for _, inter := range intersections {
 		distance = inter.manhattanDistance()
+		fmt.Println(distance)
 		if distance < shortestDistance {
 			shortestDistance = distance
 		}
