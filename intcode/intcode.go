@@ -1,3 +1,4 @@
+// Package intcode provides utilities for running intcode programs
 package intcode
 
 import (
@@ -49,6 +50,7 @@ func (o opMultiply) execute(memory []int, pos *int) {
 	prod = a * b
 
 	memory[o.params[2]] = prod
+	*pos = *pos + 4
 }
 
 type opAdd struct {
@@ -83,6 +85,7 @@ func (o opAdd) execute(memory []int, pos *int) {
 	sum = a + b
 
 	memory[o.params[2]] = sum
+	*pos = *pos + 4
 }
 
 type opInput struct {
@@ -99,16 +102,16 @@ func (o opInput) execute(memory []int, pos *int) {
 	for true {
 		fmt.Print("Enter your input: ")
 		text, _ := reader.ReadString('\n')
-		value, err = strconv.Atoi(text)
+		value, err = strconv.Atoi(strings.Trim(text, "\n"))
 		if err != nil {
-			fmt.Println("Bad input. Please provide an integer.")
+			fmt.Println("Bad input. Please provide an integer.", text)
 		} else {
 			break
 		}
 	}
 
 	memory[o.params[0]] = value
-
+	*pos = *pos + 2
 }
 
 type opOutput struct {
@@ -123,13 +126,15 @@ func (o opOutput) execute(memory []int, pos *int) {
 	case 1:
 		fmt.Println(o.params[0])
 	}
+
+	*pos = *pos + 2
 }
 
 type opTerminate struct {
 }
 
 func (opTerminate) execute(memory []int, pos *int) {
-
+	*pos = len(memory)
 }
 
 /*GetArgumentCount returns the number of arguments
@@ -228,10 +233,14 @@ func Run(memory string) int {
 	for m < len(nums) {
 		currentCode := nums[m]
 		opcode, paramModes := ParseOpCode(strconv.Itoa(currentCode))
+
+		if opcode == 99 {
+			break
+		}
+
 		argv := GetArgumentCount(opcode)
 		instr := makeInstruction(opcode, paramModes, nums[m+1:m+1+argv])
 		instr.execute(nums, &m)
-		m += argv + 1
 	}
 
 	return nums[0]
