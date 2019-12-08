@@ -130,6 +130,151 @@ func (o opOutput) execute(memory []int, pos *int) {
 	*pos = *pos + 2
 }
 
+type opJumpIfTrue struct {
+	paramModes []int
+	params     []int
+}
+
+func (o opJumpIfTrue) execute(memory []int, pos *int) {
+	var a int
+	var b int
+
+	switch o.paramModes[0] {
+	case modeImmediate:
+		a = o.params[0]
+	case modePosition:
+		a = memory[o.params[0]]
+	default:
+		a = memory[o.params[0]]
+	}
+
+	switch o.paramModes[1] {
+	case modeImmediate:
+		b = o.params[1]
+	case modePosition:
+		b = memory[o.params[1]]
+	default:
+		b = memory[o.params[1]]
+	}
+
+	// if the instruction modifies the instruction pointer,
+	// that value is used and the instruction pointer is not
+	// automatically increased.
+	// Presumably this means that if the instruction pointer is
+	// NOT modified by an operation (even though that operation could,
+	// in theory perform a modification), then the value is incremented
+	// as it would be normally
+	if a != 0 {
+		*pos = b
+	} else {
+		*pos = *pos + 3
+	}
+}
+
+type opJumpIfFalse struct {
+	paramModes []int
+	params     []int
+}
+
+func (o opJumpIfFalse) execute(memory []int, pos *int) {
+	var a int
+	var b int
+
+	switch o.paramModes[0] {
+	case modeImmediate:
+		a = o.params[0]
+	case modePosition:
+		a = memory[o.params[0]]
+	default:
+		a = memory[o.params[0]]
+	}
+
+	switch o.paramModes[1] {
+	case modeImmediate:
+		b = o.params[1]
+	case modePosition:
+		b = memory[o.params[1]]
+	default:
+		b = memory[o.params[1]]
+	}
+
+	if a == 0 {
+		*pos = b
+	} else {
+		*pos = *pos + 3
+	}
+}
+
+type opLessThan struct {
+	paramModes []int
+	params     []int
+}
+
+func (o opLessThan) execute(memory []int, pos *int) {
+	var a int
+	var b int
+
+	switch o.paramModes[0] {
+	case modeImmediate:
+		a = o.params[0]
+	case modePosition:
+		a = memory[o.params[0]]
+	default:
+		a = memory[o.params[0]]
+	}
+
+	switch o.paramModes[1] {
+	case modeImmediate:
+		b = o.params[1]
+	case modePosition:
+		b = memory[o.params[1]]
+	default:
+		b = memory[o.params[1]]
+	}
+
+	if a < b {
+		memory[o.params[2]] = 1
+	} else {
+		memory[o.params[2]] = 0
+	}
+	*pos = *pos + 4
+}
+
+type opEquals struct {
+	paramModes []int
+	params     []int
+}
+
+func (o opEquals) execute(memory []int, pos *int) {
+	var a int
+	var b int
+
+	switch o.paramModes[0] {
+	case modeImmediate:
+		a = o.params[0]
+	case modePosition:
+		a = memory[o.params[0]]
+	default:
+		a = memory[o.params[0]]
+	}
+
+	switch o.paramModes[1] {
+	case modeImmediate:
+		b = o.params[1]
+	case modePosition:
+		b = memory[o.params[1]]
+	default:
+		b = memory[o.params[1]]
+	}
+
+	if a == b {
+		memory[o.params[2]] = 1
+	} else {
+		memory[o.params[2]] = 0
+	}
+	*pos = *pos + 4
+}
+
 type opTerminate struct {
 }
 
@@ -149,6 +294,14 @@ func GetArgumentCount(opcode int) int {
 		return 1
 	case 4:
 		return 1
+	case 5:
+		return 2
+	case 6:
+		return 2
+	case 7:
+		return 3
+	case 8:
+		return 3
 	case 99:
 		return 0
 	}
@@ -193,6 +346,14 @@ func makeInstruction(opcode int, paramModes []int, params []int) instruction {
 		return opInput{paramModes: paramModes, params: params}
 	case 4:
 		return opOutput{paramModes: paramModes, params: params}
+	case 5:
+		return opJumpIfTrue{paramModes: paramModes, params: params}
+	case 6:
+		return opJumpIfFalse{paramModes: paramModes, params: params}
+	case 7:
+		return opLessThan{paramModes: paramModes, params: params}
+	case 8:
+		return opEquals{paramModes: paramModes, params: params}
 	}
 
 	return nil
