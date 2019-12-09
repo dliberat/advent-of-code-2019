@@ -2,8 +2,8 @@
 package intcode
 
 import (
-	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -13,6 +13,24 @@ const (
 	modePosition  = 0
 	modeImmediate = 1
 )
+
+// Input source for certain opcode commands
+var in *os.File = os.Stdin
+
+// Output destination for certain opcode commands
+var out *os.File = os.Stdout
+
+/*SetInFile provides a source for input arguments.
+Default is os.Stdin*/
+func SetInFile(f *os.File) {
+	in = f
+}
+
+/*SetOutFile provides a target destination where
+outputs should be written to.*/
+func SetOutFile(f *os.File) {
+	out = f
+}
 
 type instruction interface {
 	execute(memory []int, pos *int)
@@ -94,17 +112,19 @@ type opInput struct {
 }
 
 func (o opInput) execute(memory []int, pos *int) {
+	// read user input and put output into the position
+	// indicated by the parameter
 
-	reader := bufio.NewReader(os.Stdin)
+	// reader := bufio.NewReader(os.Stdin)
 	var value int = 0
-	var err error
 
 	for true {
 		fmt.Print("Enter your input: ")
-		text, _ := reader.ReadString('\n')
-		value, err = strconv.Atoi(strings.Trim(text, "\n"))
+		_, err := fmt.Fscanf(in, "%d", &value)
+		// text, _ := reader.ReadString('\n')
+		// value, err = strconv.Atoi(strings.Trim(text, "\n"))
 		if err != nil {
-			fmt.Println("Bad input. Please provide an integer.", text)
+			fmt.Println("Bad input. Please provide an integer.")
 		} else {
 			break
 		}
@@ -120,12 +140,17 @@ type opOutput struct {
 }
 
 func (o opOutput) execute(memory []int, pos *int) {
+	// output the contents of the parameter
+
+	var data string
+
 	switch o.paramModes[0] {
 	case 0:
-		fmt.Println(memory[o.params[0]])
+		data = fmt.Sprintf("%v\n", memory[o.params[0]])
 	case 1:
-		fmt.Println(o.params[0])
+		data = fmt.Sprintf("%v\n", o.params[0])
 	}
+	io.WriteString(out, data)
 
 	*pos = *pos + 2
 }

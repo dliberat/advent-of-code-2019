@@ -1,6 +1,11 @@
 package intcode
 
-import "testing"
+import (
+	"io"
+	"io/ioutil"
+	"os"
+	"testing"
+)
 
 func TestParseOpcode_1002(t *testing.T) {
 	code, params := ParseOpCode("1002")
@@ -92,6 +97,95 @@ func TestOpMultiplyImmediateMode_102_5_0_0_99(t *testing.T) {
 	if result != 510 {
 		t.Errorf("Expected 102x5=510 but got %d", result)
 	}
+}
+
+func TestOpInput_3_0_99(t *testing.T) {
+
+	in, err := ioutil.TempFile("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer in.Close()
+
+	_, err = in.Seek(0, os.SEEK_SET)
+	if err != nil {
+		os.Remove(in.Name())
+		t.Fatal(err)
+	}
+	io.WriteString(in, "42\n")
+	if err != nil {
+		os.Remove(in.Name())
+		t.Fatal(err)
+	}
+	SetInFile(in)
+
+	_, err = in.Seek(0, os.SEEK_SET)
+	if err != nil {
+		os.Remove(in.Name())
+		t.Fatal(err)
+	}
+
+	result := Run("3,0,99")
+
+	os.Remove(in.Name())
+
+	if result != 42 {
+		t.Errorf("Expected 42, got: %d", result)
+	}
+}
+
+func TestOpOutput_99(t *testing.T) {
+	f, err := ioutil.TempFile("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	SetOutFile(f)
+
+	result := Run("4,2,99")
+
+	_, err = f.Seek(0, os.SEEK_SET)
+	if err != nil {
+		os.Remove(out.Name())
+		t.Fatal(err)
+	}
+
+	bytes, err := ioutil.ReadFile(f.Name())
+	str := string(bytes)
+
+	os.Remove(out.Name())
+
+	if str != "99\n" || result != 4 {
+		t.Errorf("Expected 99 with result 4 but got: '%s' with result '%d'", str, result)
+	}
+
+}
+
+func TestOpOutput_ImmediateMode(t *testing.T) {
+	f, err := ioutil.TempFile("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	SetOutFile(f)
+
+	result := Run("104,42,99")
+
+	_, err = f.Seek(0, os.SEEK_SET)
+	if err != nil {
+		os.Remove(out.Name())
+		t.Fatal(err)
+	}
+
+	bytes, err := ioutil.ReadFile(f.Name())
+	str := string(bytes)
+
+	os.Remove(out.Name())
+
+	if str != "42\n" || result != 104 {
+		t.Errorf("Expected 42 with result 4 but got: '%s' with result '%d'", str, result)
+	}
+
 }
 
 func TestRun_Cyclic(t *testing.T) {
