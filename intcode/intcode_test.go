@@ -134,6 +134,41 @@ func TestOpInput_3_0_99(t *testing.T) {
 	}
 }
 
+func TestOpInput_Two_Inputs(t *testing.T) {
+
+	in, err := ioutil.TempFile("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer in.Close()
+
+	_, err = in.Seek(0, os.SEEK_SET)
+	if err != nil {
+		os.Remove(in.Name())
+		t.Fatal(err)
+	}
+	io.WriteString(in, "3\n42\n")
+	if err != nil {
+		os.Remove(in.Name())
+		t.Fatal(err)
+	}
+	SetInFile(in)
+
+	_, err = in.Seek(0, os.SEEK_SET)
+	if err != nil {
+		os.Remove(in.Name())
+		t.Fatal(err)
+	}
+
+	result := Run("3,2,1,0,99")
+
+	os.Remove(in.Name())
+
+	if result != 42 {
+		t.Errorf("Expected 42, got: %d", result)
+	}
+}
+
 func TestOpOutput_99(t *testing.T) {
 	f, err := ioutil.TempFile("", "")
 	if err != nil {
@@ -184,6 +219,58 @@ func TestOpOutput_ImmediateMode(t *testing.T) {
 
 	if str != "42\n" || result != 104 {
 		t.Errorf("Expected 42 with result 4 but got: '%s' with result '%d'", str, result)
+	}
+
+}
+
+func TestRun(t *testing.T) {
+
+	in, err := ioutil.TempFile("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer in.Close()
+
+	_, err = in.Seek(0, os.SEEK_SET)
+	if err != nil {
+		os.Remove(in.Name())
+		t.Fatal(err)
+	}
+	io.WriteString(in, "1\n1523\n")
+	if err != nil {
+		os.Remove(in.Name())
+		t.Fatal(err)
+	}
+	SetInFile(in)
+
+	_, err = in.Seek(0, os.SEEK_SET)
+	if err != nil {
+		os.Remove(in.Name())
+		t.Fatal(err)
+	}
+
+	f, err := ioutil.TempFile("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	SetOutFile(f)
+
+	result := Run("3,23,3,24,1002,24,10,24,1002,23,-1,23,101,5,23,23,1,24,23,23,4,23,99,0,0")
+
+	_, err = f.Seek(0, os.SEEK_SET)
+	if err != nil {
+		os.Remove(out.Name())
+		t.Fatal(err)
+	}
+
+	bytes, err := ioutil.ReadFile(f.Name())
+	str := string(bytes)
+
+	os.Remove(out.Name())
+
+	if str != "15234\n" || result != 3 {
+		t.Errorf("Expected 15234 with result 3 but got: '%s' with result '%d'", str, result)
 	}
 
 }
