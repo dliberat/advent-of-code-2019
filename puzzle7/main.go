@@ -23,14 +23,14 @@ import (
 )
 
 type amplifier struct {
-	inputFile *os.File
+	inputFile  *os.File
 	outputFile *os.File
-	memory string
-	phase int
+	memory     string
+	phase      int
 }
 
 func (amp *amplifier) run() int {
-	
+	return 0
 }
 
 func check(e error) {
@@ -48,23 +48,19 @@ func amplify(memory string, phase int, input int) int {
 	f.Seek(0, os.SEEK_SET)
 	io.WriteString(f, inputs)
 	f.Seek(0, os.SEEK_SET)
-	intcode.SetInFile(f)
 
 	o, _ := ioutil.TempFile("", "outfile.txt")
 	o.Seek(0, os.SEEK_SET)
-	intcode.SetOutFile(o)
 
-	intcode.Run(memory)
+	cpu := intcode.MakeComputer(memory, f, o)
+	cpu.Run()
 
 	o.Seek(0, os.SEEK_SET)
 
 	bytes, _ := ioutil.ReadFile(o.Name())
-	// fmt.Println("For input ", phase, input, ", Got bytes: ", bytes)
 	str := string(bytes[0 : len(bytes)-1])
 
 	output, _ := strconv.Atoi(str)
-
-	// fmt.Println("Got output: ", output)
 
 	os.Remove(f.Name())
 	os.Remove(o.Name())

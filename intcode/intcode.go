@@ -12,68 +12,17 @@ import (
 const (
 	modePosition  = 0
 	modeImmediate = 1
+	modeRelative  = 2
 )
 
-// Input source for certain opcode commands
-var in *os.File = os.Stdin
-
-// Output destination for certain opcode commands
-var out *os.File = os.Stdout
-
-/*SetInFile provides a source for input arguments.
-Default is os.Stdin*/
-func SetInFile(f *os.File) {
-	in = f
-}
-
-/*SetOutFile provides a target destination where
-outputs should be written to.*/
-func SetOutFile(f *os.File) {
-	out = f
-}
-
 type context struct {
-	in  *os.File
-	out *os.File
+	in           *os.File
+	out          *os.File
+	relativeBase int
 }
 
 type instruction interface {
-	execute(memory []int, pos *int, ctx context)
-}
-
-type opMultiply struct {
-	paramModes []int
-	params     []int
-}
-
-func (o opMultiply) execute(memory []int, pos *int, ctx context) {
-	var a int
-	var b int
-	var prod int
-
-	switch o.paramModes[0] {
-	case modeImmediate:
-		a = o.params[0]
-	case modePosition:
-		a = memory[o.params[0]]
-	default:
-		// this should really be an error
-		a = memory[o.params[0]]
-	}
-
-	switch o.paramModes[1] {
-	case modeImmediate:
-		b = o.params[1]
-	case modePosition:
-		b = memory[o.params[1]]
-	default:
-		b = memory[o.params[1]]
-	}
-
-	prod = a * b
-
-	memory[o.params[2]] = prod
-	*pos = *pos + 4
+	execute(memory *[]int, pos *int, ctx *context)
 }
 
 type opAdd struct {
@@ -81,33 +30,96 @@ type opAdd struct {
 	params     []int
 }
 
-func (o opAdd) execute(memory []int, pos *int, ctx context) {
+func (o opAdd) execute(memory *[]int, pos *int, ctx *context) {
 	var a int
 	var b int
+	var outpos int
 	var sum int
 
 	switch o.paramModes[0] {
+	case modePosition:
+		a = getValueFromMemory(memory, o.params[0])
 	case modeImmediate:
 		a = o.params[0]
-	case modePosition:
-		a = memory[o.params[0]]
+	case modeRelative:
+		a = getValueFromMemory(memory, ctx.relativeBase+o.params[0])
 	default:
-		// this should really be an error
-		a = memory[o.params[0]]
+		panic("Invalid parameter mode")
 	}
 
 	switch o.paramModes[1] {
+	case modePosition:
+		b = getValueFromMemory(memory, o.params[1])
 	case modeImmediate:
 		b = o.params[1]
-	case modePosition:
-		b = memory[o.params[1]]
+	case modeRelative:
+		b = getValueFromMemory(memory, ctx.relativeBase+o.params[1])
 	default:
-		b = memory[o.params[1]]
+		panic("Invalid parameter mode")
+	}
+
+	switch o.paramModes[2] {
+	case modePosition:
+		outpos = o.params[2]
+	case modeImmediate:
+		panic("Parameters that a function writes to should never be in immediate mode.")
+	case modeRelative:
+		outpos = ctx.relativeBase + o.params[2]
+	default:
+		panic("Invalid parameter mode")
 	}
 
 	sum = a + b
 
-	memory[o.params[2]] = sum
+	writeValueToMemory(memory, outpos, sum)
+	*pos = *pos + 4
+}
+
+type opMultiply struct {
+	paramModes []int
+	params     []int
+}
+
+func (o opMultiply) execute(memory *[]int, pos *int, ctx *context) {
+	var a int
+	var b int
+	var outpos int
+	var prod int
+
+	switch o.paramModes[0] {
+	case modePosition:
+		a = getValueFromMemory(memory, o.params[0])
+	case modeImmediate:
+		a = o.params[0]
+	case modeRelative:
+		a = getValueFromMemory(memory, ctx.relativeBase+o.params[0])
+	default:
+		panic("Invalid parameter mode.")
+	}
+
+	switch o.paramModes[1] {
+	case modePosition:
+		b = getValueFromMemory(memory, o.params[1])
+	case modeImmediate:
+		b = o.params[1]
+	case modeRelative:
+		b = getValueFromMemory(memory, ctx.relativeBase+o.params[1])
+	default:
+		panic("Invalid parameter mode.")
+	}
+
+	switch o.paramModes[2] {
+	case modePosition:
+		outpos = o.params[2]
+	case modeImmediate:
+		panic("Output parameters should never be in immediate mode.")
+	case modeRelative:
+		outpos = ctx.relativeBase + o.params[2]
+	}
+
+	prod = a * b
+
+	writeValueToMemory(memory, outpos, prod)
 	*pos = *pos + 4
 }
 
@@ -116,7 +128,7 @@ type opInput struct {
 	params     []int
 }
 
-func (o opInput) execute(memory []int, pos *int, ctx context) {
+func (o opInput) execute(memory *[]int, pos *int, ctx *context) {
 	// read user input and put output into the position
 	// indicated by the parameter
 
@@ -125,7 +137,10 @@ func (o opInput) execute(memory []int, pos *int, ctx context) {
 	var value int = 0
 
 	for true {
-		fmt.Print("Enter your input: ")
+		if ctx.in == os.Stdin {
+			fmt.Print("Enter your input: ")
+		}
+
 		_, err := fmt.Fscanf(ctx.in, "%d", &value)
 		// text, _ := reader.ReadString('\n')
 		// value, err = strconv.Atoi(strings.Trim(text, "\n"))
@@ -136,7 +151,19 @@ func (o opInput) execute(memory []int, pos *int, ctx context) {
 		}
 	}
 
-	memory[o.params[0]] = value
+	var outpos int
+
+	switch o.paramModes[0] {
+	case modePosition:
+		outpos = o.params[0]
+	case modeImmediate:
+		panic("Positions that a program writes to should never be in immediate mode.")
+	case modeRelative:
+		outpos = ctx.relativeBase + o.params[0]
+	default:
+		panic("Invalid position mode")
+	}
+	writeValueToMemory(memory, outpos, value)
 	*pos = *pos + 2
 }
 
@@ -145,19 +172,26 @@ type opOutput struct {
 	params     []int
 }
 
-func (o opOutput) execute(memory []int, pos *int, ctx context) {
+func (o opOutput) execute(memory *[]int, pos *int, ctx *context) {
 	// output the contents of the parameter
 
 	var data string
 
 	switch o.paramModes[0] {
-	case 0:
-		data = fmt.Sprintf("%v\n", memory[o.params[0]])
-	case 1:
+	case modePosition:
+		data = fmt.Sprintf("%v\n", getValueFromMemory(memory, o.params[0]))
+	case modeImmediate:
 		data = fmt.Sprintf("%v\n", o.params[0])
+	case modeRelative:
+		data = fmt.Sprintf("%v\n", getValueFromMemory(memory, ctx.relativeBase+o.params[0]))
+	default:
+		panic("Invalid parameter mode.")
 	}
 	io.WriteString(ctx.out, data)
-	ctx.out.Seek(int64(-1*len(data)), io.SeekCurrent)
+
+	if ctx.out != os.Stdout {
+		ctx.out.Seek(int64(-1*len(data)), io.SeekCurrent)
+	}
 
 	*pos = *pos + 2
 }
@@ -167,26 +201,30 @@ type opJumpIfTrue struct {
 	params     []int
 }
 
-func (o opJumpIfTrue) execute(memory []int, pos *int, ctx context) {
+func (o opJumpIfTrue) execute(memory *[]int, pos *int, ctx *context) {
 	var a int
 	var b int
 
 	switch o.paramModes[0] {
+	case modePosition:
+		a = getValueFromMemory(memory, o.params[0])
 	case modeImmediate:
 		a = o.params[0]
-	case modePosition:
-		a = memory[o.params[0]]
+	case modeRelative:
+		a = getValueFromMemory(memory, ctx.relativeBase+o.params[0])
 	default:
-		a = memory[o.params[0]]
+		panic("Invalid parameter mode.")
 	}
 
 	switch o.paramModes[1] {
+	case modePosition:
+		b = getValueFromMemory(memory, o.params[1])
 	case modeImmediate:
 		b = o.params[1]
-	case modePosition:
-		b = memory[o.params[1]]
+	case modeRelative:
+		b = getValueFromMemory(memory, ctx.relativeBase+o.params[1])
 	default:
-		b = memory[o.params[1]]
+		panic("Invalid parameter mode.")
 	}
 
 	// if the instruction modifies the instruction pointer,
@@ -208,26 +246,30 @@ type opJumpIfFalse struct {
 	params     []int
 }
 
-func (o opJumpIfFalse) execute(memory []int, pos *int, ctx context) {
+func (o opJumpIfFalse) execute(memory *[]int, pos *int, ctx *context) {
 	var a int
 	var b int
 
 	switch o.paramModes[0] {
+	case modePosition:
+		a = getValueFromMemory(memory, o.params[0])
 	case modeImmediate:
 		a = o.params[0]
-	case modePosition:
-		a = memory[o.params[0]]
+	case modeRelative:
+		a = getValueFromMemory(memory, ctx.relativeBase+o.params[0])
 	default:
-		a = memory[o.params[0]]
+		panic("Invalid parameter mode.")
 	}
 
 	switch o.paramModes[1] {
+	case modePosition:
+		b = getValueFromMemory(memory, o.params[1])
 	case modeImmediate:
 		b = o.params[1]
-	case modePosition:
-		b = memory[o.params[1]]
+	case modeRelative:
+		b = getValueFromMemory(memory, ctx.relativeBase+o.params[1])
 	default:
-		b = memory[o.params[1]]
+		panic("Invalid parameter mode.")
 	}
 
 	if a == 0 {
@@ -242,32 +284,46 @@ type opLessThan struct {
 	params     []int
 }
 
-func (o opLessThan) execute(memory []int, pos *int, ctx context) {
+func (o opLessThan) execute(memory *[]int, pos *int, ctx *context) {
 	var a int
 	var b int
+	var outpos int
 
 	switch o.paramModes[0] {
+	case modePosition:
+		a = getValueFromMemory(memory, o.params[0])
 	case modeImmediate:
 		a = o.params[0]
-	case modePosition:
-		a = memory[o.params[0]]
+	case modeRelative:
+		a = getValueFromMemory(memory, ctx.relativeBase+o.params[0])
 	default:
-		a = memory[o.params[0]]
+		panic("Invalid parameter mode")
 	}
 
 	switch o.paramModes[1] {
+	case modePosition:
+		b = getValueFromMemory(memory, o.params[1])
 	case modeImmediate:
 		b = o.params[1]
-	case modePosition:
-		b = memory[o.params[1]]
+	case modeRelative:
+		b = getValueFromMemory(memory, ctx.relativeBase+o.params[1])
 	default:
-		b = memory[o.params[1]]
+		panic("Invalid parameter mode")
+	}
+
+	switch o.paramModes[2] {
+	case modePosition:
+		outpos = o.params[2]
+	case modeImmediate:
+		panic("Positions that a function writes to should never be in immediate mode.")
+	case modeRelative:
+		outpos = ctx.relativeBase + o.params[2]
 	}
 
 	if a < b {
-		memory[o.params[2]] = 1
+		writeValueToMemory(memory, outpos, 1)
 	} else {
-		memory[o.params[2]] = 0
+		writeValueToMemory(memory, outpos, 0)
 	}
 	*pos = *pos + 4
 }
@@ -277,41 +333,75 @@ type opEquals struct {
 	params     []int
 }
 
-func (o opEquals) execute(memory []int, pos *int, ctx context) {
+func (o opEquals) execute(memory *[]int, pos *int, ctx *context) {
 	var a int
 	var b int
+	var outpos int
 
 	switch o.paramModes[0] {
+	case modePosition:
+		a = getValueFromMemory(memory, o.params[0])
 	case modeImmediate:
 		a = o.params[0]
-	case modePosition:
-		a = memory[o.params[0]]
+	case modeRelative:
+		a = getValueFromMemory(memory, ctx.relativeBase+o.params[0])
 	default:
-		a = memory[o.params[0]]
+		panic("invalid parameter mode.")
 	}
 
 	switch o.paramModes[1] {
+	case modePosition:
+		b = getValueFromMemory(memory, o.params[1])
 	case modeImmediate:
 		b = o.params[1]
-	case modePosition:
-		b = memory[o.params[1]]
+	case modeRelative:
+		b = getValueFromMemory(memory, ctx.relativeBase+o.params[1])
 	default:
-		b = memory[o.params[1]]
+		panic("Invalid parameter mode.")
+	}
+
+	switch o.paramModes[2] {
+	case modePosition:
+		outpos = o.params[2]
+	case modeImmediate:
+		panic("Positions that a function writes to should never be in immediate mode.")
+	case modeRelative:
+		outpos = ctx.relativeBase + o.params[2]
 	}
 
 	if a == b {
-		memory[o.params[2]] = 1
+		writeValueToMemory(memory, outpos, 1)
 	} else {
-		memory[o.params[2]] = 0
+		writeValueToMemory(memory, outpos, 0)
 	}
 	*pos = *pos + 4
+}
+
+type opRelativeBase struct {
+	paramModes []int
+	params     []int
+}
+
+func (o opRelativeBase) execute(memory *[]int, pos *int, ctx *context) {
+	var a int
+	switch o.paramModes[0] {
+	case modePosition:
+		a = getValueFromMemory(memory, o.params[0])
+	case modeImmediate:
+		a = o.params[0]
+	case modeRelative:
+		a = getValueFromMemory(memory, ctx.relativeBase+o.params[0])
+	}
+
+	ctx.relativeBase = ctx.relativeBase + a
+	*pos = *pos + 2
 }
 
 type opTerminate struct {
 }
 
-func (opTerminate) execute(memory []int, pos *int, ctx context) {
-	*pos = len(memory)
+func (opTerminate) execute(memory *[]int, pos *int, ctx *context) {
+	*pos = len(*memory)
 }
 
 /*GetArgumentCount returns the number of arguments
@@ -334,6 +424,8 @@ func GetArgumentCount(opcode int) int {
 		return 3
 	case 8:
 		return 3
+	case 9:
+		return 1
 	case 99:
 		return 0
 	}
@@ -366,6 +458,23 @@ func ParseOpCode(opcode string) (int, []int) {
 	return operation, paramModes
 }
 
+func getValueFromMemory(memory *[]int, address int) int {
+	if address < len(*memory) {
+		return (*memory)[address]
+	}
+	return 0
+}
+
+func writeValueToMemory(memory *[]int, address int, value int) {
+	if address >= cap(*memory) {
+		newMem := make([]int, address+1)
+		copy(newMem, *memory)
+		*memory = newMem
+	}
+
+	(*memory)[address] = value
+}
+
 func makeInstruction(opcode int, paramModes []int, params []int) instruction {
 	switch opcode {
 	case 99:
@@ -386,6 +495,8 @@ func makeInstruction(opcode int, paramModes []int, params []int) instruction {
 		return opLessThan{paramModes: paramModes, params: params}
 	case 8:
 		return opEquals{paramModes: paramModes, params: params}
+	case 9:
+		return opRelativeBase{paramModes: paramModes, params: params}
 	}
 
 	return nil
@@ -434,10 +545,16 @@ func (cpu *Computer) Run() int {
 
 		argv := GetArgumentCount(opcode)
 		instr := makeInstruction(opcode, paramModes, cpu.memory[m+1:m+1+argv])
-		instr.execute(cpu.memory, &m, cpu.ctx)
+		instr.execute(&cpu.memory, &m, &cpu.ctx)
 	}
 
 	return cpu.memory[0]
+}
+
+/*PrintState shows some of the internal state of the computer.*/
+func (cpu *Computer) PrintState() {
+	fmt.Println("Relative base: ", cpu.ctx.relativeBase)
+	fmt.Println("Memory: ", cpu.memory)
 }
 
 /*MakeComputer creates a computer object that can be used to
