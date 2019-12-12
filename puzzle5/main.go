@@ -17,6 +17,7 @@ func main() {
 	data, err := ioutil.ReadFile("input.txt")
 	check(err)
 
-	retval := intcode.Run(string(data))
+	cpu := intcode.MakeComputer(string(data), nil, nil)
+	retval := cpu.Run()
 	fmt.Println("Run completed. Output: ", retval)
 }

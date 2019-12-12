@@ -4,7 +4,10 @@ This code appears to have some bugs in it.
 With the specific combination of:
 memory = 3,23,3,24,1002,24,10,24,1002,23,-1,23,101,5,23,23,1,24,23,23,4,23,99,0,0
 phase = 1
-input =
+input = 4032
+
+The program becomes unable to read the temporary output file at line 50.
+This problem does not occur when working in the VS Code debugger.
 */
 package main
 
@@ -18,6 +21,17 @@ import (
 
 	"github.com/dliberat/advent-of-code-2019/intcode"
 )
+
+type amplifier struct {
+	inputFile *os.File
+	outputFile *os.File
+	memory string
+	phase int
+}
+
+func (amp *amplifier) run() int {
+	
+}
 
 func check(e error) {
 	if e != nil {

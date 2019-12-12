@@ -32,8 +32,13 @@ func SetOutFile(f *os.File) {
 	out = f
 }
 
+type context struct {
+	in  *os.File
+	out *os.File
+}
+
 type instruction interface {
-	execute(memory []int, pos *int)
+	execute(memory []int, pos *int, ctx context)
 }
 
 type opMultiply struct {
@@ -41,7 +46,7 @@ type opMultiply struct {
 	params     []int
 }
 
-func (o opMultiply) execute(memory []int, pos *int) {
+func (o opMultiply) execute(memory []int, pos *int, ctx context) {
 	var a int
 	var b int
 	var prod int
@@ -76,7 +81,7 @@ type opAdd struct {
 	params     []int
 }
 
-func (o opAdd) execute(memory []int, pos *int) {
+func (o opAdd) execute(memory []int, pos *int, ctx context) {
 	var a int
 	var b int
 	var sum int
@@ -111,21 +116,22 @@ type opInput struct {
 	params     []int
 }
 
-func (o opInput) execute(memory []int, pos *int) {
+func (o opInput) execute(memory []int, pos *int, ctx context) {
 	// read user input and put output into the position
 	// indicated by the parameter
 
-	// reader := bufio.NewReader(os.Stdin)
+	// reader := bufio.NewReader(ctx.in)
+	// var err error
 	var value int = 0
 
 	for true {
 		fmt.Print("Enter your input: ")
-		_, err := fmt.Fscanf(in, "%d", &value)
+		_, err := fmt.Fscanf(ctx.in, "%d", &value)
 		// text, _ := reader.ReadString('\n')
 		// value, err = strconv.Atoi(strings.Trim(text, "\n"))
-		if err != nil {
-			fmt.Println("Bad input. Please provide an integer.")
-		} else {
+		if err == nil {
+			// 	// fmt.Println("Bad input. Please provide an integer.")
+			// } else {
 			break
 		}
 	}
@@ -139,7 +145,7 @@ type opOutput struct {
 	params     []int
 }
 
-func (o opOutput) execute(memory []int, pos *int) {
+func (o opOutput) execute(memory []int, pos *int, ctx context) {
 	// output the contents of the parameter
 
 	var data string
@@ -150,7 +156,8 @@ func (o opOutput) execute(memory []int, pos *int) {
 	case 1:
 		data = fmt.Sprintf("%v\n", o.params[0])
 	}
-	io.WriteString(out, data)
+	io.WriteString(ctx.out, data)
+	ctx.out.Seek(int64(-1*len(data)), io.SeekCurrent)
 
 	*pos = *pos + 2
 }
@@ -160,7 +167,7 @@ type opJumpIfTrue struct {
 	params     []int
 }
 
-func (o opJumpIfTrue) execute(memory []int, pos *int) {
+func (o opJumpIfTrue) execute(memory []int, pos *int, ctx context) {
 	var a int
 	var b int
 
@@ -201,7 +208,7 @@ type opJumpIfFalse struct {
 	params     []int
 }
 
-func (o opJumpIfFalse) execute(memory []int, pos *int) {
+func (o opJumpIfFalse) execute(memory []int, pos *int, ctx context) {
 	var a int
 	var b int
 
@@ -235,7 +242,7 @@ type opLessThan struct {
 	params     []int
 }
 
-func (o opLessThan) execute(memory []int, pos *int) {
+func (o opLessThan) execute(memory []int, pos *int, ctx context) {
 	var a int
 	var b int
 
@@ -270,7 +277,7 @@ type opEquals struct {
 	params     []int
 }
 
-func (o opEquals) execute(memory []int, pos *int) {
+func (o opEquals) execute(memory []int, pos *int, ctx context) {
 	var a int
 	var b int
 
@@ -303,7 +310,7 @@ func (o opEquals) execute(memory []int, pos *int) {
 type opTerminate struct {
 }
 
-func (opTerminate) execute(memory []int, pos *int) {
+func (opTerminate) execute(memory []int, pos *int, ctx context) {
 	*pos = len(memory)
 }
 
@@ -405,19 +412,20 @@ func parseProgram(memory []int) []instruction {
 	return instructions[0:i]
 }
 
+/*Computer represents an instance of an intcode processor.*/
+type Computer struct {
+	ctx    context
+	memory []int
+}
+
 /*Run executes the program provided and returns the
 result at the 0th index of memory when the program is complete.*/
-func Run(memory string) int {
-	txt := strings.Split(memory, ",")
-	nums := make([]int, len(txt))
-	for i, t := range txt {
-		nums[i], _ = strconv.Atoi(t)
-	}
+func (cpu *Computer) Run() int {
 
 	var m int = 0 // index into the head of the current instruction
 
-	for m < len(nums) {
-		currentCode := nums[m]
+	for m < len(cpu.memory) {
+		currentCode := cpu.memory[m]
 		opcode, paramModes := ParseOpCode(strconv.Itoa(currentCode))
 
 		if opcode == 99 {
@@ -425,23 +433,35 @@ func Run(memory string) int {
 		}
 
 		argv := GetArgumentCount(opcode)
-		instr := makeInstruction(opcode, paramModes, nums[m+1:m+1+argv])
-		instr.execute(nums, &m)
+		instr := makeInstruction(opcode, paramModes, cpu.memory[m+1:m+1+argv])
+		instr.execute(cpu.memory, &m, cpu.ctx)
 	}
 
-	return nums[0]
+	return cpu.memory[0]
 }
 
-/*CountInstructions counts the number
-of instructions in a program*/
-func CountInstructions(memory string) int {
-	txt := strings.Split(memory, ",")
-	nums := make([]int, len(txt))
-
-	for i, t := range txt {
-		nums[i], _ = strconv.Atoi(t)
+/*MakeComputer creates a computer object that can be used to
+process intcode programs.*/
+func MakeComputer(memory string, in *os.File, out *os.File) Computer {
+	ctx := context{}
+	if in != nil {
+		ctx.in = in
+	} else {
+		ctx.in = os.Stdin
+	}
+	if out != nil {
+		ctx.out = out
+	} else {
+		ctx.out = os.Stdout
 	}
 
-	instructions := parseProgram(nums)
-	return len(instructions)
+	cpu := Computer{ctx: ctx}
+
+	txt := strings.Split(memory, ",")
+	cpu.memory = make([]int, len(txt))
+	for i, t := range txt {
+		cpu.memory[i], _ = strconv.Atoi(t)
+	}
+
+	return cpu
 }

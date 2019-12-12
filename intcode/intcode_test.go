@@ -50,57 +50,47 @@ func TestParseOpCode_leadingZero(t *testing.T) {
 	}
 }
 
-func TestCountInstructions_1_0_0_0_99(t *testing.T) {
-	count := CountInstructions("1,0,0,0,99")
-	if count != 2 {
-		t.Errorf("Expected 2 instructions, got %d", count)
-	}
-}
-
-func TestCountInstructions_1_0_0_0_2_0_0_0_99(t *testing.T) {
-	count := CountInstructions("1,0,0,0,2,0,0,0,99")
-	if count != 3 {
-		t.Errorf("Expected 3 instructions, got %d", count)
-	}
-}
-
 func TestOpTerminate_99(t *testing.T) {
-	result := Run("99")
+	cpu := MakeComputer("99", nil, nil)
+	result := cpu.Run()
 	if result != 99 {
 		t.Errorf("Expected 99, got %d", result)
 	}
 }
 
 func TestOpAdd_1_1_1_0_99(t *testing.T) {
-	result := Run("1,1,1,0,99")
+	cpu := MakeComputer("1,1,1,0,99", nil, nil)
+	result := cpu.Run()
 	if result != 2 {
 		t.Errorf("Expected 1+1=2 but got %d", result)
 	}
 }
 
 func TestOpAddImmediateMode_1101_20_22_0_99(t *testing.T) {
-	result := Run("1101,20,22,0,99")
+	cpu := MakeComputer("1101,20,22,0,99", nil, nil)
+	result := cpu.Run()
 	if result != 42 {
 		t.Errorf("Expected 20+22=42 but got %d", result)
 	}
 }
 
 func TestOpMultiply_02_0_0_0_99(t *testing.T) {
-	result := Run("02,0,0,0,99")
+	cpu := MakeComputer("02,0,0,0,99", nil, nil)
+	result := cpu.Run()
 	if result != 4 {
 		t.Errorf("Expected 2x2=4 but got %d", result)
 	}
 }
 
 func TestOpMultiplyImmediateMode_102_5_0_0_99(t *testing.T) {
-	result := Run("102,5,0,0,99")
+	cpu := MakeComputer("102,5,0,0,99", nil, nil)
+	result := cpu.Run()
 	if result != 510 {
 		t.Errorf("Expected 102x5=510 but got %d", result)
 	}
 }
 
 func TestOpInput_3_0_99(t *testing.T) {
-
 	in, err := ioutil.TempFile("", "")
 	if err != nil {
 		t.Fatal(err)
@@ -125,7 +115,8 @@ func TestOpInput_3_0_99(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result := Run("3,0,99")
+	cpu := MakeComputer("3,0,99", in, nil)
+	result := cpu.Run()
 
 	os.Remove(in.Name())
 
@@ -135,7 +126,6 @@ func TestOpInput_3_0_99(t *testing.T) {
 }
 
 func TestOpInput_Two_Inputs(t *testing.T) {
-
 	in, err := ioutil.TempFile("", "")
 	if err != nil {
 		t.Fatal(err)
@@ -160,7 +150,8 @@ func TestOpInput_Two_Inputs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result := Run("3,2,1,0,99")
+	cpu := MakeComputer("3,2,1,0,99", in, nil)
+	result := cpu.Run()
 
 	os.Remove(in.Name())
 
@@ -175,9 +166,8 @@ func TestOpOutput_99(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	SetOutFile(f)
-
-	result := Run("4,2,99")
+	cpu := MakeComputer("4,2,99", nil, f)
+	result := cpu.Run()
 
 	_, err = f.Seek(0, os.SEEK_SET)
 	if err != nil {
@@ -197,14 +187,15 @@ func TestOpOutput_99(t *testing.T) {
 }
 
 func TestOpOutput_ImmediateMode(t *testing.T) {
+
 	f, err := ioutil.TempFile("", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	SetOutFile(f)
+	cpu := MakeComputer("104,42,99", nil, f)
 
-	result := Run("104,42,99")
+	result := cpu.Run()
 
 	_, err = f.Seek(0, os.SEEK_SET)
 	if err != nil {
@@ -224,7 +215,6 @@ func TestOpOutput_ImmediateMode(t *testing.T) {
 }
 
 func TestRun(t *testing.T) {
-
 	in, err := ioutil.TempFile("", "")
 	if err != nil {
 		t.Fatal(err)
@@ -241,7 +231,6 @@ func TestRun(t *testing.T) {
 		os.Remove(in.Name())
 		t.Fatal(err)
 	}
-	SetInFile(in)
 
 	_, err = in.Seek(0, os.SEEK_SET)
 	if err != nil {
@@ -254,9 +243,9 @@ func TestRun(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	SetOutFile(f)
-
-	result := Run("3,23,3,24,1002,24,10,24,1002,23,-1,23,101,5,23,23,1,24,23,23,4,23,99,0,0")
+	prog := "3,23,3,24,1002,24,10,24,1002,23,-1,23,101,5,23,23,1,24,23,23,4,23,99,0,0"
+	cpu := MakeComputer(prog, in, f)
+	result := cpu.Run()
 
 	_, err = f.Seek(0, os.SEEK_SET)
 	if err != nil {
@@ -267,6 +256,7 @@ func TestRun(t *testing.T) {
 	bytes, err := ioutil.ReadFile(f.Name())
 	str := string(bytes)
 
+	os.Remove(in.Name())
 	os.Remove(out.Name())
 
 	if str != "15234\n" || result != 3 {
@@ -276,8 +266,35 @@ func TestRun(t *testing.T) {
 }
 
 func TestRun_Cyclic(t *testing.T) {
-	result := Run("1002,4,3,4,33")
+	cpu := MakeComputer("1002,4,3,4,33", nil, nil)
+	result := cpu.Run()
 	if result != 1002 {
 		t.Errorf("Expected 1002, 33, 3, 4, 99")
 	}
 }
+
+func runCPU(cpu *Computer) {
+	cpu.Run()
+}
+
+// func TestFeedback(t *testing.T) {
+// 	in1, _ := ioutil.TempFile("", "infile")
+// 	defer in1.Close()
+// 	in1.Seek(0, os.SEEK_SET)
+// 	io.WriteString(in1, "4\n")
+// 	in1.Seek(0, os.SEEK_SET)
+
+// 	out1, _ := ioutil.TempFile("", "outfile")
+
+// 	cpu1 := MakeComputer("3,2,1,7,3,0,99,40", in1, out1)
+// 	cpu2 := MakeComputer("3,6,1,7,8,0,99,0,0", out1, in1)
+
+// 	go runCPU(&cpu2)
+// 	result := cpu1.Run()
+
+// 	os.Remove(out.Name())
+
+// 	if result != 42 {
+// 		t.Errorf("Expected 42 but got: '%d'", result)
+// 	}
+// }
