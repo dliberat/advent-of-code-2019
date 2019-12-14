@@ -27,6 +27,8 @@ import (
 	"math"
 )
 
+type doubleChecker func(code []int) bool
+
 func flat(code []int) int {
 	ttl := 0
 	for i := 0; i < len(code); i++ {
@@ -34,6 +36,22 @@ func flat(code []int) int {
 		ttl += code[i] * int(math.Pow10(pow))
 	}
 	return ttl
+}
+
+func hasDoubleMax1Repeat(code []int) bool {
+	seqLength := 1
+
+	for i := 1; i < len(code); i++ {
+		if code[i] == code[i-1] {
+			seqLength++
+		} else {
+			if seqLength == 2 {
+				return true
+			}
+			seqLength = 1
+		}
+	}
+	return seqLength == 2
 }
 
 func hasDouble(code []int) bool {
@@ -45,7 +63,7 @@ func hasDouble(code []int) bool {
 	return false
 }
 
-func countPerms(code []int, pos int, minAtPos int, min int, max int) int {
+func countPerms(code []int, pos int, minAtPos int, min int, max int, fn doubleChecker) int {
 	perms := 0
 
 	// base case. Last digit
@@ -59,8 +77,7 @@ func countPerms(code []int, pos int, minAtPos int, min int, max int) int {
 			if flattened > max {
 				return perms
 			}
-			if hasDouble(code) {
-				fmt.Println("Valid combo found.", code)
+			if fn(code) {
 				perms++
 			}
 		}
@@ -75,7 +92,7 @@ func countPerms(code []int, pos int, minAtPos int, min int, max int) int {
 		if flat(tmp) > max {
 			break
 		}
-		perms += countPerms(tmp, pos+1, i, min, max)
+		perms += countPerms(tmp, pos+1, i, min, max, fn)
 	}
 	return perms
 }
@@ -85,6 +102,14 @@ func main() {
 	max := 746325
 	code := []int{0, 0, 0, 0, 0, 0}
 
-	perms := countPerms(code, 0, 2, min, max)
-	fmt.Println(perms)
+	// part 1
+	perms := countPerms(code, 0, 2, min, max, hasDouble)
+	fmt.Println("Possible password combinations assuming the 'any repeated number' rule: ", perms)
+
+	// part 2
+	min = 264360
+	max = 746325
+	code = []int{0, 0, 0, 0, 0, 0}
+	perms = countPerms(code, 0, 2, min, max, hasDoubleMax1Repeat)
+	fmt.Println("Possible password combinations assuming the 'repeated numbers only count if they are exactly two' rule: ", perms)
 }
