@@ -189,9 +189,9 @@ func (o opOutput) execute(memory *[]int, pos *int, ctx *context) {
 	}
 	io.WriteString(ctx.out, data)
 
-	if ctx.out != os.Stdout {
-		ctx.out.Seek(int64(-1*len(data)), io.SeekCurrent)
-	}
+	// if ctx.out != os.Stdout {
+	// 	ctx.out.Seek(int64(-1*len(data)), io.SeekCurrent)
+	// }
 
 	*pos = *pos + 2
 }
