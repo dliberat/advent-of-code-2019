@@ -16,9 +16,20 @@ const (
 )
 
 type context struct {
+	ic           int // instruction counter
 	in           *os.File
 	out          *os.File
+	inputQueue   []int
 	relativeBase int
+}
+
+/*NoInputReadyError indicates that an input instruction
+is waiting for input data, and thus the program cannot
+continue running.*/
+type NoInputReadyError struct{}
+
+func (e *NoInputReadyError) Error() string {
+	return "No input ready."
 }
 
 type instruction interface {
@@ -132,23 +143,18 @@ func (o opInput) execute(memory *[]int, pos *int, ctx *context) {
 	// read user input and put output into the position
 	// indicated by the parameter
 
-	// reader := bufio.NewReader(ctx.in)
-	// var err error
 	var value int = 0
 
-	for true {
-		if ctx.in == os.Stdin {
-			fmt.Print("Enter your input: ")
+	if ctx.in == os.Stdin {
+		for true {
+			_, err := fmt.Fscanf(ctx.in, "%d", &value)
+			if err == nil {
+				break
+			}
 		}
-
-		_, err := fmt.Fscanf(ctx.in, "%d", &value)
-		// text, _ := reader.ReadString('\n')
-		// value, err = strconv.Atoi(strings.Trim(text, "\n"))
-		if err == nil {
-			// 	// fmt.Println("Bad input. Please provide an integer.")
-			// } else {
-			break
-		}
+	} else {
+		value = ctx.inputQueue[0]
+		ctx.inputQueue = ctx.inputQueue[1:]
 	}
 
 	var outpos int
@@ -531,24 +537,37 @@ type Computer struct {
 
 /*Run executes the program provided and returns the
 result at the 0th index of memory when the program is complete.*/
-func (cpu *Computer) Run() int {
+func (cpu *Computer) Run() (int, error) {
 
-	var m int = 0 // index into the head of the current instruction
+	for true {
+		currentCode := cpu.memory[cpu.ctx.ic]
 
-	for m < len(cpu.memory) {
-		currentCode := cpu.memory[m]
 		opcode, paramModes := ParseOpCode(strconv.Itoa(currentCode))
 
 		if opcode == 99 {
 			break
 		}
 
+		// input instruction but there is no input  ready
+		if opcode == 3 && cpu.ctx.in != os.Stdin && len(cpu.ctx.inputQueue) == 0 {
+			return 0, &NoInputReadyError{}
+		}
+
 		argv := GetArgumentCount(opcode)
-		instr := makeInstruction(opcode, paramModes, cpu.memory[m+1:m+1+argv])
-		instr.execute(&cpu.memory, &m, &cpu.ctx)
+		m := cpu.ctx.ic + 1
+		instr := makeInstruction(opcode, paramModes, cpu.memory[m:m+argv])
+		instr.execute(&cpu.memory, &cpu.ctx.ic, &cpu.ctx)
 	}
 
-	return cpu.memory[0]
+	return cpu.memory[0], nil
+}
+
+/*QueueInput queues a variable number of inputs to be used
+as arguments into input instructions when required by the
+intcode program. Queued inputs are ignored if the input
+source is set to os.Stdin*/
+func (cpu *Computer) QueueInput(values ...int) {
+	cpu.ctx.inputQueue = append(cpu.ctx.inputQueue, values...)
 }
 
 /*PrintState shows some of the internal state of the computer.*/
@@ -561,16 +580,15 @@ func (cpu *Computer) PrintState() {
 process intcode programs.*/
 func MakeComputer(memory string, in *os.File, out *os.File) Computer {
 	ctx := context{}
-	if in != nil {
-		ctx.in = in
-	} else {
-		ctx.in = os.Stdin
-	}
+
+	ctx.in = in
+
 	if out != nil {
 		ctx.out = out
 	} else {
 		ctx.out = os.Stdout
 	}
+	ctx.ic = 0
 
 	cpu := Computer{ctx: ctx}
 

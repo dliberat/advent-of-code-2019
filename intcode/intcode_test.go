@@ -2,7 +2,6 @@ package intcode
 
 import (
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -53,7 +52,7 @@ func TestParseOpCode_leadingZero(t *testing.T) {
 
 func TestOpTerminate_99(t *testing.T) {
 	cpu := MakeComputer("99", nil, nil)
-	result := cpu.Run()
+	result, _ := cpu.Run()
 	if result != 99 {
 		t.Errorf("Expected 99, got %d", result)
 	}
@@ -61,7 +60,7 @@ func TestOpTerminate_99(t *testing.T) {
 
 func TestOpAdd_1_1_1_10_99(t *testing.T) {
 	cpu := MakeComputer("1,1,1,0,99", nil, nil)
-	result := cpu.Run()
+	result, _ := cpu.Run()
 	if result != 2 {
 		t.Errorf("Expected 1+1=2 but got %d", result)
 	}
@@ -69,7 +68,7 @@ func TestOpAdd_1_1_1_10_99(t *testing.T) {
 
 func TestOpAdd_PositionMode(t *testing.T) {
 	cpu := MakeComputer("1,5,7,0,99,5,0,7", nil, nil)
-	result := cpu.Run()
+	result, _ := cpu.Run()
 	if result != 12 {
 		cpu.PrintState()
 		t.Errorf("Expected 5+7=12 but got '%d'", result)
@@ -78,7 +77,7 @@ func TestOpAdd_PositionMode(t *testing.T) {
 
 func TestOpAdd_GetBeyondMemoryBounds(t *testing.T) {
 	cpu := MakeComputer("1,43,4,0,99", nil, nil)
-	result := cpu.Run()
+	result, _ := cpu.Run()
 	if result != 99 {
 		cpu.PrintState()
 		t.Errorf("Expected 0+99 to equal 99 but got '%d'", result)
@@ -87,7 +86,7 @@ func TestOpAdd_GetBeyondMemoryBounds(t *testing.T) {
 
 func TestOpAddImmediateMode_1101_20_22_0_99(t *testing.T) {
 	cpu := MakeComputer("1101,20,22,0,99", nil, nil)
-	result := cpu.Run()
+	result, _ := cpu.Run()
 	if result != 42 {
 		t.Errorf("Expected 20+22=42 but got %d", result)
 	}
@@ -95,7 +94,7 @@ func TestOpAddImmediateMode_1101_20_22_0_99(t *testing.T) {
 
 func TestOpAddRelativeMode(t *testing.T) {
 	cpu := MakeComputer("109,2,22201,-1,0,-2,99", nil, nil)
-	result := cpu.Run()
+	result, _ := cpu.Run()
 	if result != 22203 {
 		t.Errorf("Expected 22203 but got '%d'", result)
 	}
@@ -103,7 +102,7 @@ func TestOpAddRelativeMode(t *testing.T) {
 
 func TestOpMultiply_02_0_0_1_99(t *testing.T) {
 	cpu := MakeComputer("02,0,0,0,99", nil, nil)
-	result := cpu.Run()
+	result, _ := cpu.Run()
 	if result != 4 {
 		t.Errorf("Expected 2x2=4 but got %d", result)
 	}
@@ -111,7 +110,7 @@ func TestOpMultiply_02_0_0_1_99(t *testing.T) {
 
 func TestOpMultiplyImmediateMode_102_5_0_0_99(t *testing.T) {
 	cpu := MakeComputer("102,5,0,0,99", nil, nil)
-	result := cpu.Run()
+	result, _ := cpu.Run()
 	if result != 510 {
 		t.Errorf("Expected 102x5=510 but got %d", result)
 	}
@@ -119,7 +118,7 @@ func TestOpMultiplyImmediateMode_102_5_0_0_99(t *testing.T) {
 
 func TestOpMultiplyRelativeMode_zeroShift(t *testing.T) {
 	cpu := MakeComputer("1202,0,2,0,99", nil, nil)
-	result := cpu.Run()
+	result, _ := cpu.Run()
 	if result != 2404 {
 		t.Errorf("Expected 1202x2=2404 but got '%d'", result)
 	}
@@ -127,7 +126,7 @@ func TestOpMultiplyRelativeMode_zeroShift(t *testing.T) {
 
 func TestOpMultiplyRelativeMode_withShift(t *testing.T) {
 	cpu := MakeComputer("109,-1,22202,5,3,1,99", nil, nil)
-	result := cpu.Run()
+	result, _ := cpu.Run()
 	if result != 66606 {
 		cpu.PrintState()
 		t.Errorf("Expected 66606 but got '%d'", result)
@@ -135,67 +134,21 @@ func TestOpMultiplyRelativeMode_withShift(t *testing.T) {
 }
 
 func TestOpInput_3_0_99(t *testing.T) {
-	in, err := ioutil.TempFile("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer in.Close()
 
-	_, err = in.Seek(0, os.SEEK_SET)
-	if err != nil {
-		os.Remove(in.Name())
-		t.Fatal(err)
-	}
-	io.WriteString(in, "42\n")
-	if err != nil {
-		os.Remove(in.Name())
-		t.Fatal(err)
-	}
+	cpu := MakeComputer("3,0,99", nil, nil)
+	cpu.QueueInput(42)
+	result, err := cpu.Run()
 
-	_, err = in.Seek(0, os.SEEK_SET)
-	if err != nil {
-		os.Remove(in.Name())
-		t.Fatal(err)
-	}
-
-	cpu := MakeComputer("3,0,99", in, nil)
-	result := cpu.Run()
-
-	os.Remove(in.Name())
-
-	if result != 42 {
+	if result != 42 || err != nil {
 		t.Errorf("Expected 42, got: %d", result)
 	}
 }
 
 func TestOpInput_Two_Inputs(t *testing.T) {
-	in, err := ioutil.TempFile("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer in.Close()
 
-	_, err = in.Seek(0, os.SEEK_SET)
-	if err != nil {
-		os.Remove(in.Name())
-		t.Fatal(err)
-	}
-	io.WriteString(in, "3\n42\n")
-	if err != nil {
-		os.Remove(in.Name())
-		t.Fatal(err)
-	}
-
-	_, err = in.Seek(0, os.SEEK_SET)
-	if err != nil {
-		os.Remove(in.Name())
-		t.Fatal(err)
-	}
-
-	cpu := MakeComputer("3,2,1,0,99", in, nil)
-	result := cpu.Run()
-
-	os.Remove(in.Name())
+	cpu := MakeComputer("3,2,1,0,99", nil, nil)
+	cpu.QueueInput(3, 42)
+	result, _ := cpu.Run()
 
 	if result != 42 {
 		t.Errorf("Expected 42, got: %d", result)
@@ -203,36 +156,31 @@ func TestOpInput_Two_Inputs(t *testing.T) {
 }
 
 func TestOpInput_RelativeMode(t *testing.T) {
-	in, err := ioutil.TempFile("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer in.Close()
 
-	_, err = in.Seek(0, os.SEEK_SET)
-	if err != nil {
-		os.Remove(in.Name())
-		t.Fatal(err)
-	}
-	io.WriteString(in, "42\n")
-	if err != nil {
-		os.Remove(in.Name())
-		t.Fatal(err)
-	}
+	cpu := MakeComputer("109,50,203,-50,99,0", nil, nil)
+	cpu.QueueInput(42)
+	result, err := cpu.Run()
 
-	_, err = in.Seek(0, os.SEEK_SET)
-	if err != nil {
-		os.Remove(in.Name())
-		t.Fatal(err)
-	}
-
-	cpu := MakeComputer("109,50,203,-50,99,0", in, nil)
-	result := cpu.Run()
-
-	os.Remove(in.Name())
-
-	if result != 42 {
+	if result != 42 || err != nil {
 		t.Errorf("Expected 42, got: %d", result)
+	}
+}
+
+func TestOpInput_HaltAndWait(t *testing.T) {
+	cpu := MakeComputer("3,3,1101,-1,5,0,99", nil, nil)
+	result, err := cpu.Run()
+
+	if err == nil || err.Error() != "No input ready." {
+		t.Errorf("Expected error.")
+		return
+	}
+
+	cpu.QueueInput(5)
+	result, err = cpu.Run()
+
+	if err != nil || result != 10 {
+		cpu.PrintState()
+		t.Errorf("Expected 10 but got '%d'", result)
 	}
 }
 
@@ -243,7 +191,7 @@ func TestOpOutput_99(t *testing.T) {
 	}
 
 	cpu := MakeComputer("4,2,99", nil, f)
-	result := cpu.Run()
+	result, _ := cpu.Run()
 
 	_, err = f.Seek(0, os.SEEK_SET)
 	if err != nil {
@@ -271,7 +219,7 @@ func TestOpOutput_ImmediateMode(t *testing.T) {
 
 	cpu := MakeComputer("104,42,99", nil, out)
 
-	result := cpu.Run()
+	result, _ := cpu.Run()
 
 	_, err = out.Seek(0, os.SEEK_SET)
 	if err != nil {
@@ -299,7 +247,7 @@ func TestOpOutput_RelativeMode(t *testing.T) {
 
 	cpu := MakeComputer("109,42,204,-42,99", nil, out)
 
-	result := cpu.Run()
+	result, _ := cpu.Run()
 
 	_, err = out.Seek(0, os.SEEK_SET)
 	if err != nil {
@@ -320,7 +268,7 @@ func TestOpOutput_RelativeMode(t *testing.T) {
 
 func TestJumpIfTrue_False(t *testing.T) {
 	cpu := MakeComputer("109,30,105,0,9,1101,21,21,0,99,1", nil, nil)
-	result := cpu.Run()
+	result, _ := cpu.Run()
 	if result != 42 {
 		cpu.PrintState()
 		t.Errorf("Expected 42 but got '%d'", result)
@@ -328,8 +276,8 @@ func TestJumpIfTrue_False(t *testing.T) {
 }
 
 func TestJumpIfTrue_True(t *testing.T) {
-	cpu := MakeComputer("109,30,205,-29,9,1101,21,21,0,99,1", nil, nil)
-	result := cpu.Run()
+	cpu := MakeComputer("109,30,1205,-29,9,1101,21,21,0,99,1", nil, nil)
+	result, _ := cpu.Run()
 	if result != 109 {
 		cpu.PrintState()
 		t.Errorf("Expected 109 but got '%d'", result)
@@ -337,8 +285,8 @@ func TestJumpIfTrue_True(t *testing.T) {
 }
 
 func TestJumpIfFalse_False(t *testing.T) {
-	cpu := MakeComputer("109,30,106,0,9,1101,21,21,0,99,1", nil, nil)
-	result := cpu.Run()
+	cpu := MakeComputer("109,30,1106,0,9,1101,21,21,0,99,1", nil, nil)
+	result, _ := cpu.Run()
 	if result != 109 {
 		cpu.PrintState()
 		t.Errorf("Expected 109 but got '%d'", result)
@@ -347,7 +295,7 @@ func TestJumpIfFalse_False(t *testing.T) {
 
 func TestJumpIfFalse_True(t *testing.T) {
 	cpu := MakeComputer("109,30,206,-29,9,1101,21,21,0,99,1", nil, nil)
-	result := cpu.Run()
+	result, _ := cpu.Run()
 	if result != 42 {
 		cpu.PrintState()
 		t.Errorf("Expected 42 but got '%d'", result)
@@ -356,7 +304,7 @@ func TestJumpIfFalse_True(t *testing.T) {
 
 func TestLessThan_gt(t *testing.T) {
 	cpu := MakeComputer("109,4,21007,1,2,-4,99", nil, nil)
-	result := cpu.Run()
+	result, _ := cpu.Run()
 	if result != 0 {
 		cpu.PrintState()
 		t.Errorf("Expected 2 to be less than 4.")
@@ -365,7 +313,7 @@ func TestLessThan_gt(t *testing.T) {
 
 func TestLessThan_lt(t *testing.T) {
 	cpu := MakeComputer("109,4,01207,3,2,0,99", nil, nil)
-	result := cpu.Run()
+	result, _ := cpu.Run()
 	if result != 1 {
 		cpu.PrintState()
 		t.Errorf("Expected 0 to be less than 2.")
@@ -374,7 +322,7 @@ func TestLessThan_lt(t *testing.T) {
 
 func TestOpEqual_isEqual(t *testing.T) {
 	cpu := MakeComputer("9,0,21008,1,0,-9,99", nil, nil)
-	result := cpu.Run()
+	result, _ := cpu.Run()
 	if result != 1 {
 		cpu.PrintState()
 		t.Errorf("Expected 0 to be equal to 0.")
@@ -383,7 +331,7 @@ func TestOpEqual_isEqual(t *testing.T) {
 
 func TestOpEqual_isNotEqual(t *testing.T) {
 	cpu := MakeComputer("9,3,02108,-1,3,0,99,0", nil, nil)
-	result := cpu.Run()
+	result, _ := cpu.Run()
 	if result != 0 {
 		cpu.PrintState()
 		t.Errorf("Expected -1 to NOT equal 2108.")
@@ -391,28 +339,6 @@ func TestOpEqual_isNotEqual(t *testing.T) {
 }
 
 func TestRun(t *testing.T) {
-	in, err := ioutil.TempFile("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer in.Close()
-
-	_, err = in.Seek(0, os.SEEK_SET)
-	if err != nil {
-		os.Remove(in.Name())
-		t.Fatal(err)
-	}
-	io.WriteString(in, "1\n1523\n")
-	if err != nil {
-		os.Remove(in.Name())
-		t.Fatal(err)
-	}
-
-	_, err = in.Seek(0, os.SEEK_SET)
-	if err != nil {
-		os.Remove(in.Name())
-		t.Fatal(err)
-	}
 
 	out, err := ioutil.TempFile("", "")
 	if err != nil {
@@ -420,8 +346,9 @@ func TestRun(t *testing.T) {
 	}
 
 	prog := "3,23,3,24,1002,24,10,24,1002,23,-1,23,101,5,23,23,1,24,23,23,4,23,99,0,0"
-	cpu := MakeComputer(prog, in, out)
-	result := cpu.Run()
+	cpu := MakeComputer(prog, nil, out)
+	cpu.QueueInput(1, 1523)
+	result, _ := cpu.Run()
 
 	_, err = out.Seek(0, os.SEEK_SET)
 	if err != nil {
@@ -432,7 +359,6 @@ func TestRun(t *testing.T) {
 	bytes, err := ioutil.ReadFile(out.Name())
 	str := string(bytes)
 
-	os.Remove(in.Name())
 	os.Remove(out.Name())
 
 	if str != "15234\n" || result != 3 {
@@ -443,7 +369,7 @@ func TestRun(t *testing.T) {
 
 func TestRun_Cyclic(t *testing.T) {
 	cpu := MakeComputer("1002,4,3,4,33", nil, nil)
-	result := cpu.Run()
+	result, _ := cpu.Run()
 	if result != 1002 {
 		t.Errorf("Expected 1002, 33, 3, 4, 99")
 	}
@@ -477,7 +403,7 @@ func TestRun_Cyclic(t *testing.T) {
 
 func TestOpOffset(t *testing.T) {
 	cpu := MakeComputer("109,2,21101,21,21,-2,99", nil, nil)
-	result := cpu.Run()
+	result, _ := cpu.Run()
 	if result != 42 {
 		t.Errorf("Expected 21+21=42 but got '%d'", result)
 	}
@@ -485,7 +411,7 @@ func TestOpOffset(t *testing.T) {
 
 func TestOpOffset_increases(t *testing.T) {
 	cpu := MakeComputer("109,1,109,1,2201,-2,-1,0,99", nil, nil)
-	result := cpu.Run()
+	result, _ := cpu.Run()
 	if result != 110 {
 		t.Errorf("Expected 110 but got '%d'", result)
 	}
@@ -493,7 +419,7 @@ func TestOpOffset_increases(t *testing.T) {
 
 func TestAccessExtraMemory(t *testing.T) {
 	cpu := MakeComputer("2,20,1,0,99", nil, nil)
-	result := cpu.Run()
+	result, _ := cpu.Run()
 	if result != 0 {
 		t.Errorf("Expected 20 x 0 = 0 but got '%d'", result)
 	}
@@ -502,43 +428,23 @@ func TestAccessExtraMemory(t *testing.T) {
 
 func TestDay2(t *testing.T) {
 	cpu := MakeComputer("1,9,10,3,2,3,11,0,99,30,40,50", nil, nil)
-	result := cpu.Run()
+	result, _ := cpu.Run()
 	if result != 3500 {
 		t.Errorf("Expected 3500 but got '%d'", result)
 	}
 }
 
 func TestDay5_less_than_8(t *testing.T) {
-	in, err := ioutil.TempFile("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer in.Close()
-
-	_, err = in.Seek(0, os.SEEK_SET)
-	if err != nil {
-		os.Remove(in.Name())
-		t.Fatal(err)
-	}
-	io.WriteString(in, "7\n")
-	if err != nil {
-		os.Remove(in.Name())
-		t.Fatal(err)
-	}
-
-	_, err = in.Seek(0, os.SEEK_SET)
-	if err != nil {
-		os.Remove(in.Name())
-		t.Fatal(err)
-	}
-
 	out, err := ioutil.TempFile("", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	cpu := MakeComputer("3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99", in, out)
-	cpu.Run()
+	cpu := MakeComputer("3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99", nil, out)
+	cpu.QueueInput(7)
+	_, err = cpu.Run()
+
+	fmt.Println(err)
 
 	bytes, err := ioutil.ReadFile(out.Name())
 	str := string(bytes)
@@ -551,35 +457,14 @@ func TestDay5_less_than_8(t *testing.T) {
 }
 
 func TestDay5_equal_to_8(t *testing.T) {
-	in, err := ioutil.TempFile("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer in.Close()
-
-	_, err = in.Seek(0, os.SEEK_SET)
-	if err != nil {
-		os.Remove(in.Name())
-		t.Fatal(err)
-	}
-	io.WriteString(in, "8\n")
-	if err != nil {
-		os.Remove(in.Name())
-		t.Fatal(err)
-	}
-
-	_, err = in.Seek(0, os.SEEK_SET)
-	if err != nil {
-		os.Remove(in.Name())
-		t.Fatal(err)
-	}
 
 	out, err := ioutil.TempFile("", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	cpu := MakeComputer("3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99", in, out)
+	cpu := MakeComputer("3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99", nil, out)
+	cpu.QueueInput(8)
 	cpu.Run()
 
 	bytes, err := ioutil.ReadFile(out.Name())
@@ -593,35 +478,14 @@ func TestDay5_equal_to_8(t *testing.T) {
 }
 
 func TestDay5_greater_than_8(t *testing.T) {
-	in, err := ioutil.TempFile("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer in.Close()
-
-	_, err = in.Seek(0, os.SEEK_SET)
-	if err != nil {
-		os.Remove(in.Name())
-		t.Fatal(err)
-	}
-	io.WriteString(in, "9\n")
-	if err != nil {
-		os.Remove(in.Name())
-		t.Fatal(err)
-	}
-
-	_, err = in.Seek(0, os.SEEK_SET)
-	if err != nil {
-		os.Remove(in.Name())
-		t.Fatal(err)
-	}
 
 	out, err := ioutil.TempFile("", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	cpu := MakeComputer("3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99", in, out)
+	cpu := MakeComputer("3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99", nil, out)
+	cpu.QueueInput(9)
 	cpu.Run()
 
 	bytes, err := ioutil.ReadFile(out.Name())
@@ -635,35 +499,14 @@ func TestDay5_greater_than_8(t *testing.T) {
 }
 
 func TestDay5_jump_zero_position(t *testing.T) {
-	in, err := ioutil.TempFile("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer in.Close()
-
-	_, err = in.Seek(0, os.SEEK_SET)
-	if err != nil {
-		os.Remove(in.Name())
-		t.Fatal(err)
-	}
-	io.WriteString(in, "0\n")
-	if err != nil {
-		os.Remove(in.Name())
-		t.Fatal(err)
-	}
-
-	_, err = in.Seek(0, os.SEEK_SET)
-	if err != nil {
-		os.Remove(in.Name())
-		t.Fatal(err)
-	}
 
 	out, err := ioutil.TempFile("", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	cpu := MakeComputer("3,12,6,12,15,1,13,14,13,4,13,99,-1,0,1,9", in, out)
+	cpu := MakeComputer("3,12,6,12,15,1,13,14,13,4,13,99,-1,0,1,9", nil, out)
+	cpu.QueueInput(0)
 	cpu.Run()
 
 	bytes, err := ioutil.ReadFile(out.Name())
@@ -677,35 +520,13 @@ func TestDay5_jump_zero_position(t *testing.T) {
 }
 
 func TestDay5_jump_non_zero_position(t *testing.T) {
-	in, err := ioutil.TempFile("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer in.Close()
-
-	_, err = in.Seek(0, os.SEEK_SET)
-	if err != nil {
-		os.Remove(in.Name())
-		t.Fatal(err)
-	}
-	io.WriteString(in, "43\n")
-	if err != nil {
-		os.Remove(in.Name())
-		t.Fatal(err)
-	}
-
-	_, err = in.Seek(0, os.SEEK_SET)
-	if err != nil {
-		os.Remove(in.Name())
-		t.Fatal(err)
-	}
-
 	out, err := ioutil.TempFile("", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	cpu := MakeComputer("3,12,6,12,15,1,13,14,13,4,13,99,-1,0,1,9", in, out)
+	cpu := MakeComputer("3,12,6,12,15,1,13,14,13,4,13,99,-1,0,1,9", nil, out)
+	cpu.QueueInput(43)
 	cpu.Run()
 
 	bytes, err := ioutil.ReadFile(out.Name())
@@ -719,35 +540,13 @@ func TestDay5_jump_non_zero_position(t *testing.T) {
 }
 
 func TestDay5_jump_zero_immediate(t *testing.T) {
-	in, err := ioutil.TempFile("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer in.Close()
-
-	_, err = in.Seek(0, os.SEEK_SET)
-	if err != nil {
-		os.Remove(in.Name())
-		t.Fatal(err)
-	}
-	io.WriteString(in, "0\n")
-	if err != nil {
-		os.Remove(in.Name())
-		t.Fatal(err)
-	}
-
-	_, err = in.Seek(0, os.SEEK_SET)
-	if err != nil {
-		os.Remove(in.Name())
-		t.Fatal(err)
-	}
-
 	out, err := ioutil.TempFile("", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	cpu := MakeComputer("3,3,1105,-1,9,1101,0,0,12,4,12,99,1", in, out)
+	cpu := MakeComputer("3,3,1105,-1,9,1101,0,0,12,4,12,99,1", nil, out)
+	cpu.QueueInput(0)
 	cpu.Run()
 
 	bytes, err := ioutil.ReadFile(out.Name())
@@ -761,35 +560,14 @@ func TestDay5_jump_zero_immediate(t *testing.T) {
 }
 
 func TestDay5_jump_non_zero_immediate(t *testing.T) {
-	in, err := ioutil.TempFile("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer in.Close()
-
-	_, err = in.Seek(0, os.SEEK_SET)
-	if err != nil {
-		os.Remove(in.Name())
-		t.Fatal(err)
-	}
-	io.WriteString(in, "32\n")
-	if err != nil {
-		os.Remove(in.Name())
-		t.Fatal(err)
-	}
-
-	_, err = in.Seek(0, os.SEEK_SET)
-	if err != nil {
-		os.Remove(in.Name())
-		t.Fatal(err)
-	}
 
 	out, err := ioutil.TempFile("", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	cpu := MakeComputer("3,3,1105,-1,9,1101,0,0,12,4,12,99,1", in, out)
+	cpu := MakeComputer("3,3,1105,-1,9,1101,0,0,12,4,12,99,1", nil, out)
+	cpu.QueueInput(32)
 	cpu.Run()
 
 	bytes, err := ioutil.ReadFile(out.Name())
@@ -807,7 +585,7 @@ func TestDay9_quine(t *testing.T) {
 		t.Fatal(err)
 	}
 	cpu := MakeComputer("109,1,204,-1,1001,100,1,100,1008,100,16,101,1006,101,0,99", nil, nil)
-	result := cpu.Run()
+	result, _ := cpu.Run()
 
 	bytes, err := ioutil.ReadFile(out.Name())
 	str := string(bytes)
