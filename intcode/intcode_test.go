@@ -375,32 +375,6 @@ func TestRun_Cyclic(t *testing.T) {
 	}
 }
 
-// func runCPU(cpu *Computer) {
-// 	cpu.Run()
-// }
-
-// func TestFeedback(t *testing.T) {
-// 	in1, _ := ioutil.TempFile("", "infile")
-// 	defer in1.Close()
-// 	in1.Seek(0, os.SEEK_SET)
-// 	io.WriteString(in1, "4\n")
-// 	in1.Seek(0, os.SEEK_SET)
-
-// 	out1, _ := ioutil.TempFile("", "outfile")
-
-// 	cpu1 := MakeComputer("3,2,1,7,3,0,99,40", in1, out1)
-// 	cpu2 := MakeComputer("3,6,1,7,8,0,99,0,0", out1, in1)
-
-// 	go runCPU(&cpu2)
-// 	result := cpu1.Run()
-
-// 	os.Remove(out.Name())
-
-// 	if result != 42 {
-// 		t.Errorf("Expected 42 but got: '%d'", result)
-// 	}
-// }
-
 func TestOpOffset(t *testing.T) {
 	cpu := MakeComputer("109,2,21101,21,21,-2,99", nil, nil)
 	result, _ := cpu.Run()
