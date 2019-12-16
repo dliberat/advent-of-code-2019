@@ -146,6 +146,7 @@ func (o opInput) execute(memory *[]int, pos *int, ctx *context) {
 	var value int = 0
 
 	if ctx.in == os.Stdin {
+		fmt.Println("Input: ")
 		for true {
 			_, err := fmt.Fscanf(ctx.in, "%d", &value)
 			if err == nil {
