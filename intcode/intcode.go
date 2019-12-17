@@ -20,6 +20,7 @@ type context struct {
 	in           *os.File
 	out          *os.File
 	inputQueue   []int
+	outputBuffer []int
 	relativeBase int
 }
 
@@ -182,23 +183,25 @@ type opOutput struct {
 func (o opOutput) execute(memory *[]int, pos *int, ctx *context) {
 	// output the contents of the parameter
 
-	var data string
+	var data int
 
 	switch o.paramModes[0] {
 	case modePosition:
-		data = fmt.Sprintf("%v\n", getValueFromMemory(memory, o.params[0]))
+		data = getValueFromMemory(memory, o.params[0])
 	case modeImmediate:
-		data = fmt.Sprintf("%v\n", o.params[0])
+		data = o.params[0]
 	case modeRelative:
-		data = fmt.Sprintf("%v\n", getValueFromMemory(memory, ctx.relativeBase+o.params[0]))
+		data = getValueFromMemory(memory, ctx.relativeBase+o.params[0])
 	default:
 		panic("Invalid parameter mode.")
 	}
-	io.WriteString(ctx.out, data)
 
-	// if ctx.out != os.Stdout {
-	// 	ctx.out.Seek(int64(-1*len(data)), io.SeekCurrent)
-	// }
+	if ctx.out == nil {
+		ctx.outputBuffer = append(ctx.outputBuffer, data)
+	} else {
+		val := fmt.Sprintf("%v\n", data)
+		io.WriteString(ctx.out, val)
+	}
 
 	*pos = *pos + 2
 }
@@ -571,6 +574,20 @@ func (cpu *Computer) QueueInput(values ...int) {
 	cpu.ctx.inputQueue = append(cpu.ctx.inputQueue, values...)
 }
 
+/*FlushOutput returns a copy of all the outputs the
+computer has buffered and clears the buffer.*/
+func (cpu *Computer) FlushOutput() []int {
+	cpy := make([]int, 0)
+
+	for _, v := range cpu.ctx.outputBuffer {
+		cpy = append(cpy, v)
+	}
+
+	cpu.ctx.outputBuffer = nil
+
+	return cpy
+}
+
 /*PrintState shows some of the internal state of the computer.*/
 func (cpu *Computer) PrintState() {
 	fmt.Println("Relative base: ", cpu.ctx.relativeBase)
@@ -580,17 +597,8 @@ func (cpu *Computer) PrintState() {
 /*MakeComputer creates a computer object that can be used to
 process intcode programs.*/
 func MakeComputer(memory string, in *os.File, out *os.File) Computer {
-	ctx := context{}
 
-	ctx.in = in
-
-	if out != nil {
-		ctx.out = out
-	} else {
-		ctx.out = os.Stdout
-	}
-	ctx.ic = 0
-
+	ctx := context{in: in, out: out, ic: 0}
 	cpu := Computer{ctx: ctx}
 
 	txt := strings.Split(memory, ",")

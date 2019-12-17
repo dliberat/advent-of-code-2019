@@ -606,3 +606,30 @@ func TestDay9_16digitNum(t *testing.T) {
 		t.Errorf("Expected a 16-digit number but but got '%s'", str)
 	}
 }
+
+func TestOutputBuffer(t *testing.T) {
+	cpu := MakeComputer("4,0,104,42,99", nil, nil)
+	cpu.Run()
+
+	output := cpu.FlushOutput()
+
+	if len(output) != 2 || output[0] != 4 || output[1] != 42 {
+		t.Errorf("Expected [4 42] but got %v", output)
+	}
+}
+
+func TestOutputBuffer_GetsFlushed(t *testing.T) {
+	cpu := MakeComputer("104,42,3,0,4,0,99", nil, nil)
+	cpu.Run()
+	output := cpu.FlushOutput()
+	if len(output) != 1 || output[0] != 42 {
+		t.Errorf("Expected [42] but got %v", output)
+	}
+
+	cpu.QueueInput(74)
+	cpu.Run()
+	output = cpu.FlushOutput()
+	if len(output) != 1 || output[0] != 74 {
+		t.Errorf("Expected [74] but got %v", output)
+	}
+}
