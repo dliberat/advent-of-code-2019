@@ -594,6 +594,22 @@ func (cpu *Computer) PrintState() {
 	fmt.Println("Memory: ", cpu.memory)
 }
 
+/*Clone produces a replica of the computer with all
+its internal state intact.*/
+func (cpu *Computer) Clone() Computer {
+	mem := make([]int, len(cpu.memory))
+	copy(mem, cpu.memory)
+
+	iq := make([]int, len(cpu.ctx.inputQueue))
+	copy(iq, cpu.ctx.inputQueue)
+
+	oq := make([]int, len(cpu.ctx.outputBuffer))
+	copy(oq, cpu.ctx.outputBuffer)
+
+	ctx := context{ic: cpu.ctx.ic, in: cpu.ctx.in, out: cpu.ctx.out, inputQueue: iq, outputBuffer: oq, relativeBase: cpu.ctx.relativeBase}
+	return Computer{memory: mem, ctx: ctx}
+}
+
 /*MakeComputer creates a computer object that can be used to
 process intcode programs.*/
 func MakeComputer(memory string, in *os.File, out *os.File) Computer {

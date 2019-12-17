@@ -633,3 +633,29 @@ func TestOutputBuffer_GetsFlushed(t *testing.T) {
 		t.Errorf("Expected [74] but got %v", output)
 	}
 }
+
+func TestClone(t *testing.T) {
+	cpu := MakeComputer("3,0,4,0,3,0,3,1,4,0,99", nil, nil)
+	cpu.QueueInput(1)
+	cpu.Run()
+
+	clone := cpu.Clone()
+
+	cpu.QueueInput(2)
+	clone.QueueInput(200, 0)
+
+	cpu.Run()
+	clone.Run()
+
+	cpu.QueueInput(0)
+	cpu.Run()
+
+	cpuOutput := cpu.FlushOutput()
+	cloneOutput := clone.FlushOutput()
+
+	if len(cpuOutput) != 2 || len(cloneOutput) != 2 ||
+		cpuOutput[0] != 1 || cloneOutput[0] != 1 ||
+		cpuOutput[1] != 2 || cloneOutput[1] != 200 {
+		t.Errorf("Expected [1 2], [1 200] but got: %v, %v", cpuOutput, cloneOutput)
+	}
+}
