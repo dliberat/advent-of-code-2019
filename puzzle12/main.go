@@ -11,6 +11,18 @@ func abs(a int) int {
 	return a
 }
 
+type node struct {
+	val      int
+	children map[int]*node
+}
+
+type trie struct {
+	root node
+	f    vectorMaker
+}
+
+type vectorMaker func(...body) []int
+
 type body struct {
 	x    int
 	y    int
@@ -52,10 +64,6 @@ func (b *body) getPotentialEnergy() int {
 
 func (b *body) getKineticEnergy() int {
 	return abs(b.velX) + abs(b.velY) + abs(b.velZ)
-}
-
-func (b *body) print() string {
-	return fmt.Sprintf("<body x: %d, y: %d, z: %d; vX: %d, vY: %d, vZ: %d>", b.x, b.y, b.z, b.velX, b.velY, b.velZ)
 }
 
 func makeBody(x int, y int, z int) body {
@@ -113,7 +121,6 @@ func part1() {
 
 	// time steps
 	for ts := 0; ts < 1000; ts++ {
-		//fmt.Println("Time step: ", ts)
 
 		for i := range system {
 			for j, o := range system {
@@ -127,9 +134,7 @@ func part1() {
 
 		for i := range system {
 			system[i].update()
-			// fmt.Println(system[i].print())
 		}
-		//fmt.Println("")
 
 	}
 
@@ -141,48 +146,113 @@ func part1() {
 	fmt.Println("[Part1] Total Energy: ", ttlEnergy)
 }
 
-func getPositionHash(a body, b body, c body, d body) string {
-	return fmt.Sprintf("%d%d%d%d%d%d%d%d%d%d%d%d",
-		a.x, a.y, a.z,
-		b.x, b.y, b.z,
-		c.x, c.y, c.z,
-		d.x, d.y, d.z)
-}
-func getVelocityHash(a body, b body, c body, d body) string {
-	return fmt.Sprintf("%d%d%d%d%d%d%d%d%d%d%d%d",
-		a.velX, a.velY, a.velZ,
-		b.velX, b.velY, b.velZ,
-		c.velX, c.velY, c.velZ,
-		d.velX, d.velY, d.velZ)
+func makeNode(val int) *node {
+	return &node{val: val, children: make(map[int]*node)}
 }
 
-func part2() {
-	/* Brute force algorithm. Won't work. */
+/*vectorX creates a vector out of the x position
+and x velocity components of the system state*/
+func vectorX(bodies ...body) []int {
+	v := make([]int, len(bodies)*2)
+	for i := range bodies {
+		v[i] = bodies[i].x
+		v[i+1] = bodies[i].velX
+	}
+	return v
+}
 
+/*vectorY creates a vector out of the y position
+and y velocity components of the system state*/
+func vectorY(bodies ...body) []int {
+	v := make([]int, len(bodies)*2)
+	for i := range bodies {
+		v[i] = bodies[i].y
+		v[i+1] = bodies[i].velY
+	}
+	return v
+}
+
+/*vectorZ creates a vector out of the z position
+and z velocity components of the system state*/
+func vectorZ(bodies ...body) []int {
+	v := make([]int, len(bodies)*2)
+	for i := range bodies {
+		v[i] = bodies[i].z
+		v[i+1] = bodies[i].velZ
+	}
+	return v
+}
+
+func (t *trie) insert(system []body) bool {
+	current := &(t.root)
+
+	// everything but the last body because
+	// on the last body we need to do some special checking
+	for _, b := range system[:len(system)-1] {
+		vector := t.f(b)
+
+		for _, v := range vector {
+			if current.children[v] == nil {
+				current.children[v] = makeNode(v)
+			}
+			current = current.children[v]
+
+		}
+	}
+
+	// final body. Check if the leaf node already exists
+	b := system[len(system)-1]
+
+	vector := t.f(b)
+
+	for _, v := range vector[:len(vector)-1] {
+		if current.children[v] == nil {
+			current.children[v] = makeNode(v)
+		}
+		current = current.children[v]
+	}
+
+	if current.children[vector[len(vector)-1]] == nil {
+		current.children[vector[len(vector)-1]] = makeNode(vector[len(vector)-1])
+		return false
+	}
+	return true
+}
+
+/*Greatest common divisor*/
+func gcd(x int, y int) int {
+	for y != 0 {
+		x, y = y, x%y
+	}
+	return x
+}
+
+/*Least-common multiple*/
+func lcm(nums ...int) int {
+
+	if len(nums) > 2 {
+		return lcm(nums[0], lcm(nums[1:]...))
+	}
+
+	return nums[0] * nums[1] / gcd(nums[0], nums[1])
+
+}
+
+func findPeriod(f vectorMaker) int {
 	system := getInput()
 
-	var ts int64 = 1
-	var phash string
-	var vhash string
-	var posMap map[string]map[string]int64
-	posMap = make(map[string]map[string]int64)
+	// The trie will keep track of every single state of the system
+	// with respect to the specified axis (x, y, or z, as determined
+	// by the vectorMaker function) as it evolves
+	t := trie{root: node{val: 0, children: make(map[int]*node)}, f: f}
 
+	t.insert(system)
+
+	var timeStepAtRepeat int
+	var repeatedState []int
+
+	ts := 0
 	for true {
-
-		phash = getPositionHash(system[0], system[1], system[2], system[3])
-		vhash = getVelocityHash(system[0], system[1], system[2], system[3])
-
-		if posMap[phash] == nil {
-			posMap[phash] = make(map[string]int64)
-			posMap[phash][vhash] = ts
-		} else {
-			if posMap[phash][vhash] == 0 {
-				posMap[phash][vhash] = ts
-			} else {
-				fmt.Println("[Part 2] Found repeated state at time step", ts-1)
-				return
-			}
-		}
 
 		for i := range system {
 			for j, o := range system {
@@ -197,8 +267,78 @@ func part2() {
 			system[i].update()
 		}
 
+		if t.insert(system) {
+			// Reverted back to a previously visited state.
+			// From this point forward, the system's evolution
+			// will repeat in a cycle. If the cycle includes the initial
+			// state of the system, the period would be equal to ts
+			timeStepAtRepeat = ts
+			repeatedState = f(system...)
+			break
+		}
+
 		ts++
 	}
+
+	// it's possible that the cycle doesn't start at the
+	// initial condition, so we need to spin it up again and
+	// make sure about the period length
+	system = getInput()
+
+	ts = 0
+	for true {
+
+		currentState := f(system...)
+		for v := range currentState {
+			if currentState[v] != repeatedState[v] {
+				break
+			}
+			// found the initial occurence of the repeated state!
+			return timeStepAtRepeat - ts + 1
+		}
+
+		for i := range system {
+			for j, o := range system {
+				if i == j {
+					continue
+				}
+				system[i].applyGravity(o)
+			}
+		}
+		for i := range system {
+			system[i].update()
+		}
+
+		ts++
+	}
+
+	return -1 // this should never happen
+}
+
+func part2() {
+
+	/* Because the x, y, and z components of state (positions and velocities)
+	all evolve independently of each other, we can find the period of the
+	functions on each axis without needing to consider the other two axes.*/
+
+	xAxisPeriod := findPeriod(vectorX)
+	fmt.Println("The x axis cycles every", xAxisPeriod, "time steps")
+
+	yAxisPeriod := findPeriod(vectorY)
+	fmt.Println("The y axis cycles every", yAxisPeriod, "time steps")
+
+	zAxisPeriod := findPeriod(vectorZ)
+	fmt.Println("The z axis cycles every", zAxisPeriod, "time steps")
+
+	/*Then, assuming that the initial state of each axis is part of
+	the stable periodic funcion, the lowest common multiple of the
+	three periods will give us the first time index at which all
+	components of state return to their initial conditions.
+	(Note the assumption: If the planets take some amount of time
+	to settle into a periodic pattern, the lcm method would not work)*/
+	period := lcm(xAxisPeriod, yAxisPeriod, zAxisPeriod)
+
+	fmt.Println("[Part2]: The period of the moons' orbits is", period)
 }
 
 func main() {
