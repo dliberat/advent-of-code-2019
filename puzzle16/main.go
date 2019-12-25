@@ -5,130 +5,103 @@ import (
 	"io/ioutil"
 	"strconv"
 	"strings"
+
+	"github.com/dliberat/advent-of-code-2019/matmul"
 )
 
-func getPattern(n int, msglen int) []int {
-	base := []int{0, 1, 0, -1}
+func absoluteLastDigit(num int) int {
+	if num < 0 {
+		num *= -1
+	}
+	return num % 10
+}
 
-	pattern := make([]int, 0)
+func generateEncodingMatrix(offset int, msglen int) matmul.CSRMatrix {
+	M := matmul.CSRMatrix{}
 
-	sz := 0 //vector size
+	// do this once for each element in the message
+	for i := offset; i < offset+msglen; i++ {
 
-	for _, b := range base {
-		for i := 0; i < n; i++ {
-			pattern = append(pattern, b)
-			if sz == msglen {
-				break
+		pattern := make([]int, msglen)
+
+		// starting from column i, i+1 columns are filled with 1s
+		// then, skip i+1 columns (because they are zeroes)
+		// then, i+1 columns are filled with -1s
+		// then, skip i+1 columns
+		// repeat until the column number equals the length of the message
+
+		j := i
+		for j < len(pattern) {
+
+			for n := 0; n < i+1 && j < len(pattern); n++ {
+				pattern[j] = 1
+				j++
 			}
+			j += i + 1
+			for n := 0; n < i+1 && j < len(pattern); n++ {
+				pattern[j] = -1
+				j++
+			}
+			j += i + 1
 		}
+
+		M.AddRow(pattern)
+
 	}
 
-	return pattern
-}
-
-func applyPattern(input []int, pattern []int) int {
-	ttl := 0
-
-	i := 1
-
-	for _, val := range input {
-		ttl += val * pattern[i]
-		i = (i + 1) % len(pattern)
-	}
-
-	if ttl < 0 {
-		ttl *= -1
-	}
-
-	return ttl % 10
-}
-
-func applyPatternFast(input []int, n int) int {
-	ttl := 0
-
-	sign := 1
-
-	// start on the first element whose pattern number is not a zero
-	i := n - 1
-
-	for i < len(input) {
-		for j := 0; j < n && i < len(input); j++ {
-			ttl += sign * input[i]
-			i++
-		}
-		i += n
-		sign *= -1
-	}
-
-	if ttl < 0 {
-		ttl *= -1
-	}
-
-	return ttl % 10
-
-}
-
-func fft(input []int) []int {
-	output := make([]int, len(input))
-
-	for i := range output {
-		// pattern := getPattern(i+1, len(input))
-		output[i] = applyPatternFast(input, i+1)
-	}
-	return output
-}
-
-func runfft(input []int, output *[]int, from int, to int, flag *chan bool) {
-	for i := from; i < to; i++ {
-		(*output)[i] = applyPatternFast(input, i+1)
-	}
-	(*flag) <- true
-}
-
-func mtFft(input []int) []int {
-	output := make([]int, len(input))
-	ol := len(output)
-
-	threadcount := 8
-	flags := make([]chan bool, threadcount)
-	for i := range flags {
-		flags[i] = make(chan bool)
-
-		from := i * ol / threadcount
-		to := (i + 1) * ol / threadcount
-
-		fmt.Println("Launching process from ", from, "to", to)
-		go runfft(input, &output, from, to, &flags[i])
-	}
-
-	for i := range flags {
-		<-flags[i]
-	}
-
-	return output
+	return M
 }
 
 func part1(signal []int) {
-	i := 0
-	for i < 100 {
-		signal = fft(signal)
-		i++
+
+	/*
+		The ith row of the encoding matrix represents the pattern
+		corresponding to the ith entry in the signal.
+	*/
+	M := generateEncodingMatrix(0, len(signal))
+
+	for i := 0; i < 100; i++ {
+		signal = matmul.VectorMultiplyAbsUnits(&signal, &M)
 	}
+
 	fmt.Println("[Part1] The first 8 digits after 100 iterations are:", signal[0:8])
 }
 
-func part2(signal []int) {
-	/* This naive approach is too slow. It will never finish. */
-	offsetStr := fmt.Sprintf("%d%d%d%d%d%d%d", signal[0], signal[1], signal[2], signal[3], signal[4], signal[5], signal[6])
-	offset, _ := strconv.Atoi(offsetStr)
-	fmt.Println("Message offset is:", offset)
+func part2(signal []int, offset int) {
+
+	// This matrix is on the order of 500,000 x 500,000.
+	// Even in CSR format it's too big to hold in memory.
+	// M := generateEncodingMatrix(offset, len(signal))
+
+	/* Instead we can take advantage of the fact that the entire message length is
+	   about 6,500,000 numbers, but the message offset is on the order of 6,000,000.
+		 That's well beyond the halfway mark, and we can note that the lower half
+		 of the encoding matrix is a simple triangular matrix. Here is an 8x8 example:
+
+		1  0 -1  0  1  0 -1  0
+		0  1  1  0  0 -1 -1  0
+		0  0  1  1  1  0  0  0
+		0  0  0  1  1  1  1  0
+		0  0  0  0  1  1  1  1  <- halfway down
+		0  0  0  0  0  1  1  1
+		0  0  0  0  0  0  1  1
+		0  0  0  0  0  0  0  1
+	*/
 
 	for i := 0; i < 100; i++ {
-		fmt.Println("iter: ", i)
-		signal = mtFft(signal)
+
+		prev := 0
+		newsignal := make([]int, len(signal))
+
+		for j := len(signal) - 1; j >= 0; j-- {
+			newsignal[j] = absoluteLastDigit(prev + signal[j])
+			prev = newsignal[j]
+		}
+
+		signal = newsignal
 	}
 
-	fmt.Println("[Part2] Your message is:", signal[offset:offset+9])
+	fmt.Println("[Part2] Your message is:", signal[:8])
 }
 
 func main() {
@@ -147,7 +120,7 @@ func main() {
 
 	part1(signal)
 
-	// // for part 2, the signal is the original signal repeated 10000 times
+	// for part 2, the signal is the original signal repeated 10000 times
 	signal = nil
 
 	for i := 0; i < 10000; i++ {
@@ -157,6 +130,15 @@ func main() {
 		}
 	}
 
-	part2(signal)
+	offsetStr := fmt.Sprintf("%d%d%d%d%d%d%d", signal[0], signal[1], signal[2], signal[3], signal[4], signal[5], signal[6])
+	offset, _ := strconv.Atoi(offsetStr)
+	fmt.Println("Message offset is:", offset)
+	fmt.Println("Original signal is ", len(signal), " items long.")
+
+	trimmedSignal := make([]int, len(signal)-offset)
+	for i := 0; i < len(trimmedSignal); i++ {
+		trimmedSignal[i] = signal[offset+i]
+	}
+	part2(trimmedSignal, offset)
 
 }
