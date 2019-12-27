@@ -574,6 +574,21 @@ func (cpu *Computer) QueueInput(values ...int) {
 	cpu.ctx.inputQueue = append(cpu.ctx.inputQueue, values...)
 }
 
+/*QueueASCIIInput allows for convenient conversion between
+string data and its ascii representation for input into an
+Intcode processor. Note that while an intcode computer can only
+accept ascii data in the normal ascii range, this convenience
+function does not actually check to ensure that the input
+string conforms to this constraint.*/
+func (cpu *Computer) QueueASCIIInput(value string) {
+	byteArray := []byte(value)
+	intArray := make([]int, len(byteArray))
+	for i := range byteArray {
+		intArray[i] = int(byteArray[i])
+	}
+	cpu.ctx.inputQueue = append(cpu.ctx.inputQueue, intArray...)
+}
+
 /*FlushOutput returns a copy of all the outputs the
 computer has buffered and clears the buffer.*/
 func (cpu *Computer) FlushOutput() []int {
@@ -586,6 +601,25 @@ func (cpu *Computer) FlushOutput() []int {
 	cpu.ctx.outputBuffer = nil
 
 	return cpy
+}
+
+/*FlushASCIIOutput returns a copy of the outputs the computer
+as buffered as if they represented a string with ASCII encoding,
+and clears the buffer. Values that don't fit in the ASCII character
+set will be shown as their full integer value*/
+func (cpu *Computer) FlushASCIIOutput() string {
+
+	str := ""
+	for _, v := range cpu.ctx.outputBuffer {
+		if v >= 0 && v <= 127 {
+			val := byte(v)
+			str += string(val)
+		} else {
+			str = fmt.Sprintf("%s %d", str, v)
+		}
+	}
+	cpu.ctx.outputBuffer = nil
+	return str
 }
 
 /*PrintState shows some of the internal state of the computer.*/
