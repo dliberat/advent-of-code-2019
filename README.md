@@ -23,7 +23,7 @@ Complete the calendar yourself, at [https://adventofcode.com/2019/](https://adve
 |11    | O O     | Intcode input/output. 2D image rendering.
 |12    | O O     | N-Body physics simulation. Periodic functions.
 |13    | O O     | Intcode input/output. Game AI (Arkanoid)
-|14    | X X     | 
+|14    | O X     | Depth-first search.
 |15    | O O     | Intcode input/output.
 |16    | O O     | Sparse matrix multiplication. Triangular matrix multiplication.
 |17    | O X     | 
