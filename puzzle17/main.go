@@ -206,6 +206,7 @@ func part2() {
 
 	for _, v := range output {
 		if v < 128 {
+			// ASCII range
 			fmt.Print(string(v))
 		} else {
 			fmt.Println("[Part 2] Total space dust collected", v)
