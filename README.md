@@ -33,6 +33,6 @@ Complete the calendar yourself, at [https://adventofcode.com/2019/](https://adve
 |21    | ★ ★     | Boolean algebra
 |22    | ★ ☆     | Modular arithmetic
 |23    | ★ ★     | Network packet routing (naive approach)
-|24    | ★ ☆     | Conway's Game Of Life. Bitshifting.
+|24    | ★ ★     | Conway's Game Of Life. Bitwise operations.
 |25    | ☆ ☆     |
 
