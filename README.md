@@ -29,7 +29,7 @@ Complete the calendar yourself, at [https://adventofcode.com/2019/](https://adve
 |17    | ★ ★     | Set and Forget                         | Longest common, non-repeating substring.
 |18    | ☆ ☆     | Many-Worlds Interpretation             |
 |19    | ★ ★     | Tractor Beam                           | 2D collisions.
-|20    | ★ ☆     | Donut Maze                             | Maze solving. Breadth-first search.
+|20    | ★ ★     | Donut Maze                             | Maze solving. Breadth-first search. A* Search.
 |21    | ★ ★     | Springdroid Adventure                  | Boolean algebra.
 |22    | ★ ☆     | Slam Shuffle                           | Modular arithmetic.
 |23    | ★ ★     | Category Six                           | Network packet routing (naive approach).
