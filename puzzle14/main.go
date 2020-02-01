@@ -3,36 +3,153 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
-	"math"
-	"sort"
 	"strconv"
 	"strings"
 )
 
 type reaction struct {
-	reactants map[string]int
-	outputs   map[string]int
+	outputName string
+	outputAmt  int
+	inputs     map[string]int
 }
 
-func min(nums []int) int {
-	least := math.Inf(1)
-	for _, n := range nums {
-		if float64(n) < least {
-			least = float64(n)
+/* ========================= PRIORITY QUEUE ========================= */
+
+type queueItem struct {
+	r           reaction
+	amtRequired int
+}
+
+type fifoQueue struct {
+	items []queueItem
+}
+
+func (q *fifoQueue) push(r reaction, amt int) {
+	item := queueItem{r: r, amtRequired: amt}
+	q.items = append(q.items, item)
+}
+
+func (q *fifoQueue) pop() (reaction, int) {
+	i := q.items[0]
+	q.items = q.items[1:]
+	return i.r, i.amtRequired
+}
+
+func (q *fifoQueue) size() int {
+	return len(q.items)
+}
+
+/* =========================  ========================= */
+
+func scalarMultiplyMap(m map[string]int, n int) map[string]int {
+	output := make(map[string]int)
+	for k, v := range m {
+		output[k] = v * n
+	}
+	return output
+}
+
+func findReaction(name string, reactions []reaction) reaction {
+	for _, r := range reactions {
+		if r.outputName == name {
+			return r
 		}
 	}
-	return int(least)
+	panic("Reaction " + name + " does not exist.")
 }
 
-func getInput() string {
-	data, err := ioutil.ReadFile("input.txt")
+func part1(filname string) (int, map[string]int) {
+	input := getInput(filename)
+	reactions := parseReactionList(input)
+
+	totalReqdOreAmt := 0
+	onHand := make(map[string]int)
+	fuel := findReaction("FUEL", reactions)
+	queue := fifoQueue{}
+	queue.push(fuel, 1)
+
+	for queue.size() > 0 {
+		target, amt := queue.pop()
+
+		// in order to make the target, we need this many of each input element
+		required := scalarMultiplyMap(target.inputs, amt)
+
+		// before trying to make more, use up anything we have on hand
+		for requirementName, requiredAmt := range required {
+			if onHand[requirementName] > 0 {
+				diff := requiredAmt - onHand[requirementName]
+				if diff > 0 {
+					// we can cover part of the requirement using on-hand materials.
+					// Therefore, reduce the amount required by however many we have on hand
+					required[requirementName] = requiredAmt - onHand[requirementName]
+					// and use up anything we have on hand
+					onHand[requirementName] = 0
+				} else {
+					// we can cover the entire requirement using on-hand materials
+					onHand[requirementName] = onHand[requirementName] - requiredAmt
+					required[requirementName] = 0
+				}
+			}
+		}
+
+		// Whatever is left in 'required' needs to be created
+		for requirementName, requiredAmt := range required {
+			if requirementName == "ORE" {
+				// ore has no constituent elements (it is the raw material)
+				totalReqdOreAmt += requiredAmt
+				continue
+			} else if requiredAmt == 0 {
+				continue
+			}
+
+			r := findReaction(requirementName, reactions)
+			needToMake := 1
+			for r.outputAmt*needToMake < requiredAmt {
+				needToMake++
+			}
+
+			queue.push(r, needToMake)
+
+			// depending on the nature of the reaction, we may need to make
+			// more than we really need (e.g. if the reaction makes element
+			// X in increments of 5, but we only need 3, we will have 2 left
+			// over). Keep this amount on hand since we might use those
+			// leftovers for other reactions.
+			leftOver := r.outputAmt*needToMake - requiredAmt
+			onHand[requirementName] = onHand[requirementName] + leftOver
+		}
+
+		// repeat until the queue is empty
+	}
+
+	fmt.Println("[PART 1]", totalReqdOreAmt, "ORE are required in order to make 1 FUEL.")
+	fmt.Println("The following elements are left over from the procedure:", onHand)
+
+	return totalReqdOreAmt, onHand
+
+}
+
+func main() {
+	part1("input.txt")
+}
+
+/* ========================= INPUT PROCESSING ========================= */
+
+func getInput(filename string) string {
+	data, err := ioutil.ReadFile(filename)
 	if err != nil {
 		panic("Cannot read input program.")
 	}
 	return string(data)
 }
 
-func parseReactionSide(txt string) map[string]int {
+/**parseReactionLeftHandSide reads the left side of a reaction
+string and returns a map whose keys are the elements and values are the
+amounts associated with each element.
+Ex:
+  parseReactionLeftHandSide("3 A, 4 B") == {"A": 3, "B": 4}
+*/
+func parseReactionLeftHandSide(txt string) map[string]int {
 	m := make(map[string]int)
 
 	elements := strings.Split(txt, ",")
@@ -49,231 +166,42 @@ func parseReactionSide(txt string) map[string]int {
 	return m
 }
 
+/**parseReactionRightHandSide reads the right side of a reaction string and
+returns a reaction struct with its outputName and outputAmt set. The
+inputs to the reaction must be processed separately using the left
+hand side of the reaction string.*/
+func parseReactionRightHandSide(txt string) reaction {
+	s := strings.Split(txt, " ")
+	amt, err := strconv.Atoi(s[0])
+	if err != nil {
+		panic("Invalid right-hand side for the reaction.")
+	}
+	r := reaction{outputAmt: amt, outputName: s[1]}
+	return r
+}
+
+/**parseReactionList reads the entire puzzle input and returns a slice
+of reaction structs representing the same data.*/
 func parseReactionList(txt string) []reaction {
 	reactions := make([]reaction, 0)
 
-	lst := strings.Split(txt, "\n")
-	for _, line := range lst {
+	for _, line := range strings.Split(txt, "\n") {
 
 		arrowIndex := strings.Index(line, "=>")
 		if arrowIndex < 0 {
-			fmt.Println("Error. Cannot find arrow in reaction:", line)
+			// not a reaction
 			continue
 		}
 
 		lhs := strings.Trim(line[0:arrowIndex], " ")
-		lhMap := parseReactionSide(lhs)
+		lhMap := parseReactionLeftHandSide(lhs)
 
 		rhs := strings.Trim(line[arrowIndex+2:], " ")
-		rhMap := parseReactionSide(rhs)
+		r := parseReactionRightHandSide(rhs)
+		r.inputs = lhMap
 
-		react := reaction{reactants: lhMap, outputs: rhMap}
-
-		reactions = append(reactions, react)
+		reactions = append(reactions, r)
 	}
 
 	return reactions
-}
-
-func mapHash(a *map[string]int) string {
-	arr := make([]string, len(*a))
-	i := 0
-	for k, v := range *a {
-		arr[i] = fmt.Sprintf("%s%d", k, v)
-		i++
-	}
-	sort.Strings(arr)
-	return strings.Join(arr, "")
-}
-
-func cloneMap(a *map[string]int) map[string]int {
-	b := make(map[string]int)
-	for k, v := range *a {
-		b[k] = v
-	}
-	return b
-}
-
-func findReactionWithOutput(k string, reactions *[]reaction) reaction {
-	for i := range *reactions {
-		for key := range (*reactions)[i].outputs {
-			if key == k {
-				return (*reactions)[i]
-			}
-		}
-	}
-
-	panic("No reaction with the requested output")
-}
-
-func checkCompletion(a *map[string]int) bool {
-	for k, v := range *a {
-		if k == "ORE" || v <= 0 {
-			continue
-		}
-		return false
-	}
-	return true
-}
-
-func getCandidateReactions(a *map[string]int, reactions *[]reaction) []reaction {
-	candidates := make([]reaction, 0)
-	for k, v := range *a {
-		if k != "ORE" && v > 0 {
-			r := findReactionWithOutput(k, reactions)
-			candidates = append(candidates, r)
-		}
-	}
-	return candidates
-}
-
-func applyOneReduction(a *map[string]int, r reaction) {
-
-	for reactant, amt := range r.reactants {
-		(*a)[reactant] = (*a)[reactant] + amt
-	}
-	for output, amt := range r.outputs {
-		(*a)[output] = (*a)[output] - amt
-	}
-
-}
-
-func nonLossyReductions(a *map[string]int, reactions *[]reaction) {
-
-	didReactionsFlag := true // exit condition
-
-	for didReactionsFlag {
-
-		b := make(map[string]int)
-
-		didReactionsFlag = false
-
-		// k = element
-		// v = amount needed
-		for k, v := range *a {
-
-			if v == 0 {
-				continue
-			}
-
-			if b[k] > 0 {
-				v += b[k]
-				b[k] = 0
-			}
-
-			if k == "ORE" { // ORE is not produced by any reaction
-				b[k] = v
-				continue
-			}
-
-			r := findReactionWithOutput(k, reactions)
-
-			// while the output is still less than or equal to the entire needed amount,
-			// do as many reactions as we can without going over.
-			// this can be optimized later
-			for r.outputs[k] <= v {
-				didReactionsFlag = true
-
-				b[k] = v
-
-				for reactant, amt := range r.reactants {
-					b[reactant] = b[reactant] + amt
-				}
-				for output, amt := range r.outputs {
-					// it's possible to have more on hand than we need. Therefore, negative numbers
-					b[output] = b[output] - amt
-				}
-
-				v = b[k]
-				b[k] = 0
-			}
-
-			b[k] = b[k] + v
-		}
-
-		*a = b
-	}
-
-}
-
-var visited map[string]int = make(map[string]int)
-var best int = math.MaxInt64
-var limit int = 500
-
-func dfs(a map[string]int, reactions *[]reaction, depth int) int {
-
-	if a["ORE"] >= best {
-		return best
-	}
-
-	if checkCompletion(&a) {
-		fmt.Println("hit completion at 209 with depth", depth, "and ore:", a["ORE"])
-		if a["ORE"] < best {
-			best = a["ORE"]
-		}
-		return best
-	}
-
-	limit--
-	if limit <= 0 {
-		return best
-	}
-
-	nonLossyReductions(&a, reactions)
-
-	hash := mapHash(&a)
-	if visited[hash] > 0 {
-		return visited[hash]
-	}
-
-	if a["ORE"] >= best {
-		visited[hash] = a["ORE"]
-		return best
-	}
-
-	if checkCompletion(&a) {
-		if a["ORE"] < best {
-			best = a["ORE"]
-		}
-		return best
-	}
-
-	candidates := getCandidateReactions(&a, reactions)
-	scores := make([]int, len(candidates))
-
-	for i := range candidates {
-		clone := cloneMap(&a)
-		applyOneReduction(&clone, candidates[i])
-
-		scores[i] = dfs(clone, reactions, depth+1)
-
-	}
-
-	score := min(scores)
-	if score < best {
-		best = score
-	}
-
-	visited[hash] = score
-	return score
-}
-
-func part1() {
-	input := getInput()
-	reactions := parseReactionList(input)
-
-	a := make(map[string]int)
-	a["FUEL"] = 1
-
-	// stabilizes to the correct answer, but takes too long to traverse
-	// the entire graph of possible combinations. Fortunately, we can set
-	// a recursion limit and be fairly confident that it will
-	// return the correct result
-	dfs(a, &reactions, 0)
-
-	fmt.Println("[Part 1] At least", best, "ore is needed to generate 1 fuel.")
-}
-
-func main() {
-	part1()
 }
