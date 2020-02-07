@@ -7,112 +7,167 @@ import (
 	"strings"
 )
 
-type deck struct {
-	cards []int
-}
-
-/*newStack reverses the order of cards in the deck.*/
-func (d *deck) newStack() {
-
-	i := 0
-	j := len(d.cards) - 1
-
-	for i < j {
-		d.cards[i], d.cards[j] = d.cards[j], d.cards[i]
-		i++
-		j--
+func abs(n int) int {
+	if n < 0 {
+		n *= -1
 	}
+	return n
 }
 
-/*cut cuts the deck at the specified point, shifting the
-front n cards to the back of the deck. If n is negative,
-the same operation is performed starting from the back
-of the deck.*/
-func (d *deck) cut(n int) {
-
-	var m int
-
-	if n > 0 {
-		m = n
-	} else if n < 0 {
-		m = len(d.cards) + n // add because n is negative
-	} else {
-		return
+func floorMod(n, mod int) int {
+	r := n % mod
+	if (mod > 0 && r < 0) || (mod < 0 && r > 0) {
+		return r + mod
 	}
-
-	c := d.cards[:m]
-	d.cards = d.cards[m:]
-	d.cards = append(d.cards, c...)
+	return r
 }
 
-func (d *deck) dealIncrement(n int) {
-
-	shuffled := make([]int, len(d.cards))
-	j := 0
-
-	for i := range d.cards {
-		shuffled[j] = d.cards[i]
-		j = (j + n) % len(shuffled)
-	}
-
-	d.cards = shuffled
+/*Deck represents a deck of space cards*/
+type Deck struct {
+	offset int
+	factor int
+	size   int
 }
 
-func (d *deck) findCardPosition(n int) int {
-	for i, card := range d.cards {
-		if card == n {
+func (d *Deck) cut(N int) {
+	d.offset = floorMod(d.offset-N, d.size)
+}
+
+func (d *Deck) dealWithIncrement(N int) {
+	d.factor = floorMod(d.factor*N, d.size)
+	d.offset = floorMod(d.offset*N, d.size)
+}
+
+func (d *Deck) cutNandDealWithIncM(N, M int) {
+	d.factor = floorMod(d.factor*M, d.size)
+	d.offset = floorMod((d.offset-N)*M, d.size)
+}
+
+func (d *Deck) dealIntoNewStack() {
+	d.offset = floorMod((d.size-1)-d.offset, d.size)
+	d.factor = floorMod(d.factor*-1, d.size)
+}
+
+func (d *Deck) cardPos(N int) int {
+	// (A * B) mod C = (A mod C * B mod C) mod C
+	// (A + B) mod C = (A mod C + B mod C) mod C
+	mx := floorMod(d.factor*N, d.size)
+	return floorMod(abs(mx+d.offset), d.size)
+}
+
+func (d *Deck) cardAtPos(N int) int {
+	// there must be a more efficient way of doing this
+	for i := 0; i < d.size; i++ {
+		if d.cardPos(i) == N {
 			return i
 		}
 	}
 	return -1
 }
 
-func (d *deck) display() {
-	fmt.Println(d.cards)
-}
-
-func makeDeck(size int) deck {
-	d := deck{cards: make([]int, size)}
-	for i := 0; i < size; i++ {
-		d.cards[i] = i
+func (d *Deck) toSlice() []int {
+	repr := make([]int, d.size)
+	for i := 0; i < d.size; i++ {
+		pos := d.cardPos(i)
+		repr[pos] = i
 	}
-	return d
+	return repr
 }
 
-func parseInstruction(instruction string, d *deck) {
+/*MakeDeck creates a new deck of size "size" in factory order.*/
+func MakeDeck(size int) Deck {
+	return Deck{size: size, offset: 0, factor: 1}
+}
+
+func trackCardPosition(instruction string, cardpos int, decksize int) int {
 	if instruction == "deal into new stack" {
-		d.newStack()
-		return
+		return abs(decksize - cardpos - 1)
 	}
 	if instruction[:4] == "cut " {
 		val, err := strconv.Atoi(instruction[4:])
 		if err != nil {
 			panic("Can't parse number")
 		}
-		d.cut(val)
-		return
+
+		newpos := ((decksize - val) + cardpos) % decksize
+		return abs(newpos)
 	}
 	if instruction[:20] == "deal with increment " {
 		val, err := strconv.Atoi(instruction[20:])
 		if err != nil {
 			panic("Can't parse number.")
 		}
-		d.dealIncrement(val)
-		return
+
+		newpos := (cardpos * val) % decksize
+		return abs(newpos)
 	}
 
+	return -1
+}
+
+func part1() {
+
+	instr := getInput("input.txt")
+	decksize := 10007
+	card := 2019
+
+	for _, i := range instr {
+		card = trackCardPosition(i, card, decksize)
+	}
+
+	fmt.Println("[Part 1] Card 2019 is at position", card)
+}
+
+func runInstructionSet(d *Deck, instr []string) {
+	for _, instruction := range instr {
+		if instruction == "deal into new stack" {
+			d.dealIntoNewStack()
+			continue
+		}
+
+		if instruction[:4] == "cut " {
+			val, err := strconv.Atoi(instruction[4:])
+			if err != nil {
+				panic("Can't parse number")
+			}
+
+			d.cut(val)
+			continue
+		}
+
+		if instruction[:20] == "deal with increment " {
+			val, err := strconv.Atoi(instruction[20:])
+			if err != nil {
+				panic("Can't parse number.")
+			}
+
+			d.dealWithIncrement(val)
+			continue
+		}
+	}
+}
+
+func part2() {
+	instr := getInput("input.txt")
+
+	d := MakeDeck(119315717514047)
+
+	runInstructionSet(&d, instr)
+	fmt.Println(d)
+
+	runInstructionSet(&d, instr)
+	fmt.Println(d)
+
+	runInstructionSet(&d, instr)
+	fmt.Println(d)
+
+	runInstructionSet(&d, instr)
+	fmt.Println(d)
 }
 
 func main() {
-	d := makeDeck(10007)
-
-	instr := getInput("input.txt")
-	for _, i := range instr {
-		parseInstruction(i, &d)
-	}
-
-	card := d.findCardPosition(2019)
-	fmt.Println("[Part 1] Card 2019 is at position", card)
+	part1()
+	part2()
 }
 
 func getInput(path string) []string {
