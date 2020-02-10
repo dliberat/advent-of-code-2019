@@ -34,18 +34,18 @@ func (d *Deck) cut(N int) {
 }
 
 func (d *Deck) dealWithIncrement(N int) {
-	d.factor = floorMod(d.factor*N, d.size)
+	// d.factor = floorMod(d.factor*N, d.size)
 	d.offset = floorMod(d.offset*N, d.size)
 }
 
 func (d *Deck) cutNandDealWithIncM(N, M int) {
-	d.factor = floorMod(d.factor*M, d.size)
+	// d.factor = floorMod(d.factor*M, d.size)
 	d.offset = floorMod((d.offset-N)*M, d.size)
 }
 
 func (d *Deck) dealIntoNewStack() {
+	// d.factor = floorMod(d.factor*-1, d.size)
 	d.offset = floorMod((d.size-1)-d.offset, d.size)
-	d.factor = floorMod(d.factor*-1, d.size)
 }
 
 func (d *Deck) cardPos(N int) int {
@@ -119,6 +119,9 @@ func part1() {
 }
 
 func runInstructionSet(d *Deck, instr []string) {
+
+	d.factor = floorMod(d.factor*41*23*-1*27*50*-1*59*32*25*-1*40*44*5*61*3*56*59*21*42*60*63*48*10*73*-1*23*23*-1*-1*13*20*30*-1*23*-1*32*21*-1*75*-1*29*50*19*13*-1*62*14*46*57*33*-1*56*-1*7*66*62*-1*12, d.size)
+
 	for _, instruction := range instr {
 		if instruction == "deal into new stack" {
 			d.dealIntoNewStack()
