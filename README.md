@@ -23,7 +23,7 @@ Complete the calendar yourself, at [https://adventofcode.com/2019/](https://adve
 |11    | ★ ★     | Space Police                           | Intcode input/output. 2D image rendering.
 |12    | ★ ★     | The N-Body Problem                     | Physics simulation. Periodic functions.
 |13    | ★ ★     | Care Package                           | Intcode input/output. Game AI (Arkanoid)
-|14    | ★ ☆     | Space Stoichiometry                    | Depth-first search.
+|14    | ★ ★     | Space Stoichiometry                    | Priority queue. Trial and error.
 |15    | ★ ★     | Oxygen System                          | Intcode input/output.
 |16    | ★ ★     | Flawed Frequency Transmission          | Sparse matrix multiplication. Triangular matrix multiplication.
 |17    | ★ ★     | Set and Forget                         | Longest common, non-repeating substring.
