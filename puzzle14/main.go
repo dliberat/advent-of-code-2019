@@ -58,15 +58,13 @@ func findReaction(name string, reactions []reaction) reaction {
 	panic("Reaction " + name + " does not exist.")
 }
 
-func part1(filname string) (int, map[string]int) {
-	input := getInput(filename)
-	reactions := parseReactionList(input)
+func part1(reactions []reaction, targetAmt int) int {
 
 	totalReqdOreAmt := 0
 	onHand := make(map[string]int)
 	fuel := findReaction("FUEL", reactions)
 	queue := fifoQueue{}
-	queue.push(fuel, 1)
+	queue.push(fuel, targetAmt)
 
 	for queue.size() > 0 {
 		target, amt := queue.pop()
@@ -122,15 +120,42 @@ func part1(filname string) (int, map[string]int) {
 		// repeat until the queue is empty
 	}
 
-	fmt.Println("[PART 1]", totalReqdOreAmt, "ORE are required in order to make 1 FUEL.")
-	fmt.Println("The following elements are left over from the procedure:", onHand)
+	return totalReqdOreAmt
+}
 
-	return totalReqdOreAmt, onHand
+func part2(reactions []reaction, totalOre int) int {
+	targetFuel := 2_000_000
+	increment := 1_000_000
 
+	for increment >= 1 {
+		reqOre := 0
+
+		for reqOre < totalOre {
+			targetFuel += increment
+			reqOre = part1(reactions, targetFuel)
+			fmt.Println(reqOre, "ORE =>", targetFuel, "FUEL")
+		}
+
+		targetFuel -= increment
+
+		if increment == 1 {
+			break
+		}
+		increment /= 10
+	}
+
+	return targetFuel
 }
 
 func main() {
-	part1("input.txt")
+	input := getInput("input.txt")
+	reactions := parseReactionList(input)
+
+	p1 := part1(reactions, 1)
+	fmt.Println("[PART 1]", p1, "ORE are required in order to make 1 FUEL")
+
+	p2 := part2(reactions, 1_000_000_000_000)
+	fmt.Println("[PART 2] Up to", p2, "FUEL can be generated with 1 trillion ORE")
 }
 
 /* ========================= INPUT PROCESSING ========================= */
