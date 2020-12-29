@@ -27,7 +27,7 @@ Complete the calendar yourself, at [https://adventofcode.com/2019/](https://adve
 |15    | ★ ★     | Oxygen System                          | Intcode input/output.
 |16    | ★ ★     | Flawed Frequency Transmission          | Sparse matrix multiplication. Triangular matrix multiplication.
 |17    | ★ ★     | Set and Forget                         | Longest common, non-repeating substring.
-|18    | ☆ ☆     | Many-Worlds Interpretation             |
+|18    | ★ ★     | Many-Worlds Interpretation             | Shortest path. Dynamic programming.
 |19    | ★ ★     | Tractor Beam                           | 2D collisions.
 |20    | ★ ★     | Donut Maze                             | Maze solving. Breadth-first search. A* Search.
 |21    | ★ ★     | Springdroid Adventure                  | Boolean algebra.
