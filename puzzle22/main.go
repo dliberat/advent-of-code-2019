@@ -1,176 +1,49 @@
+/*I could not have completed this challenge without the walkthrough provided by Spheniscine:
+https://codeforces.com/blog/entry/72593 */
 package main
 
 import (
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"strconv"
 	"strings"
 )
 
-func abs(n int) int {
-	if n < 0 {
-		n *= -1
-	}
-	return n
+// lcf represents a linear congruential function in the form f(x) = ax + b mod m
+type lcf struct {
+	a *big.Int
+	b *big.Int
+	m *big.Int // modulo
 }
 
-func floorMod(n, mod int) int {
-	r := n % mod
-	if (mod > 0 && r < 0) || (mod < 0 && r > 0) {
-		return r + mod
-	}
-	return r
-}
+// compose two functions f(x) and g(x). First apply f(x), then apply g(x). g(f(x)).
+func (f *lcf) compose(g lcf) lcf {
+	//(a, b) ; (c, d) = (ac mod m, bc+d mod m)
 
-/*Deck represents a deck of space cards*/
-type Deck struct {
-	offset int
-	factor int
-	size   int
-}
-
-func (d *Deck) cut(N int) {
-	d.offset = floorMod(d.offset-N, d.size)
-}
-
-func (d *Deck) dealWithIncrement(N int) {
-	// d.factor = floorMod(d.factor*N, d.size)
-	d.offset = floorMod(d.offset*N, d.size)
-}
-
-func (d *Deck) cutNandDealWithIncM(N, M int) {
-	// d.factor = floorMod(d.factor*M, d.size)
-	d.offset = floorMod((d.offset-N)*M, d.size)
-}
-
-func (d *Deck) dealIntoNewStack() {
-	// d.factor = floorMod(d.factor*-1, d.size)
-	d.offset = floorMod((d.size-1)-d.offset, d.size)
-}
-
-func (d *Deck) cardPos(N int) int {
-	// (A * B) mod C = (A mod C * B mod C) mod C
-	// (A + B) mod C = (A mod C + B mod C) mod C
-	mx := floorMod(d.factor*N, d.size)
-	return floorMod(abs(mx+d.offset), d.size)
-}
-
-func (d *Deck) cardAtPos(N int) int {
-	// there must be a more efficient way of doing this
-	for i := 0; i < d.size; i++ {
-		if d.cardPos(i) == N {
-			return i
-		}
-	}
-	return -1
-}
-
-func (d *Deck) toSlice() []int {
-	repr := make([]int, d.size)
-	for i := 0; i < d.size; i++ {
-		pos := d.cardPos(i)
-		repr[pos] = i
-	}
-	return repr
-}
-
-/*MakeDeck creates a new deck of size "size" in factory order.*/
-func MakeDeck(size int) Deck {
-	return Deck{size: size, offset: 0, factor: 1}
-}
-
-func trackCardPosition(instruction string, cardpos int, decksize int) int {
-	if instruction == "deal into new stack" {
-		return abs(decksize - cardpos - 1)
-	}
-	if instruction[:4] == "cut " {
-		val, err := strconv.Atoi(instruction[4:])
-		if err != nil {
-			panic("Can't parse number")
-		}
-
-		newpos := ((decksize - val) + cardpos) % decksize
-		return abs(newpos)
-	}
-	if instruction[:20] == "deal with increment " {
-		val, err := strconv.Atoi(instruction[20:])
-		if err != nil {
-			panic("Can't parse number.")
-		}
-
-		newpos := (cardpos * val) % decksize
-		return abs(newpos)
+	if f.m.Cmp(g.m) != 0 {
+		panic("cannot compose functions with different modulos")
 	}
 
-	return -1
+	newA := big.NewInt(1)
+	newA.Mul(f.a, g.a)
+	newA.Mod(newA, f.m)
+
+	newB := big.NewInt(1)
+	newB.Mul(f.b, g.a)
+	newB.Add(newB, g.b)
+	newB.Mod(newB, f.m)
+	return lcf{a: newA, b: newB, m: f.m}
 }
 
-func part1() {
-
-	instr := getInput("input.txt")
-	decksize := 10007
-	card := 2019
-
-	for _, i := range instr {
-		card = trackCardPosition(i, card, decksize)
-	}
-
-	fmt.Println("[Part 1] Card 2019 is at position", card)
-}
-
-func runInstructionSet(d *Deck, instr []string) {
-
-	d.factor = floorMod(d.factor*41*23*-1*27*50*-1*59*32*25*-1*40*44*5*61*3*56*59*21*42*60*63*48*10*73*-1*23*23*-1*-1*13*20*30*-1*23*-1*32*21*-1*75*-1*29*50*19*13*-1*62*14*46*57*33*-1*56*-1*7*66*62*-1*12, d.size)
-
-	for _, instruction := range instr {
-		if instruction == "deal into new stack" {
-			d.dealIntoNewStack()
-			continue
-		}
-
-		if instruction[:4] == "cut " {
-			val, err := strconv.Atoi(instruction[4:])
-			if err != nil {
-				panic("Can't parse number")
-			}
-
-			d.cut(val)
-			continue
-		}
-
-		if instruction[:20] == "deal with increment " {
-			val, err := strconv.Atoi(instruction[20:])
-			if err != nil {
-				panic("Can't parse number.")
-			}
-
-			d.dealWithIncrement(val)
-			continue
-		}
-	}
-}
-
-func part2() {
-	instr := getInput("input.txt")
-
-	d := MakeDeck(119315717514047)
-
-	runInstructionSet(&d, instr)
-	fmt.Println(d)
-
-	runInstructionSet(&d, instr)
-	fmt.Println(d)
-
-	runInstructionSet(&d, instr)
-	fmt.Println(d)
-
-	runInstructionSet(&d, instr)
-	fmt.Println(d)
-}
-
-func main() {
-	part1()
-	part2()
+// operate returns the position of the card x after the shuffle represented by this lcf.
+func (f *lcf) operate(x *big.Int) *big.Int {
+	// f(x) = ax + b mod m
+	fx := big.NewInt(-1)
+	fx.Mul(f.a, x)
+	fx.Add(fx, f.b)
+	fx.Mod(fx, f.m)
+	return fx
 }
 
 func getInput(path string) []string {
@@ -182,4 +55,111 @@ func getInput(path string) []string {
 	txt := string(data)
 	instructions := strings.Split(txt, "\n")
 	return instructions
+}
+
+// instr2Lcf converts an instruction in text form into its lcf representation.
+// deal into new stack: f(x) = -x - 1 mod m
+// cut N: f(x) = x - n mod m
+// deal with increment N: f(x) = nx mod m
+func instr2Lcf(instruction string, deckSize *big.Int) lcf {
+	if instruction == "deal into new stack" {
+		return lcf{a: big.NewInt(-1), b: big.NewInt(-1), m: deckSize}
+	}
+
+	if instruction[:4] == "cut " {
+		val, err := strconv.Atoi(instruction[4:])
+		if err != nil {
+			panic("Can't parse number")
+		}
+		n := int64(val)
+		return lcf{a: big.NewInt(1), b: big.NewInt(-n), m: deckSize}
+	}
+
+	if instruction[:20] == "deal with increment " {
+		val, err := strconv.Atoi(instruction[20:])
+		if err != nil {
+			panic("Can't parse number.")
+		}
+		n := int64(val)
+
+		return lcf{a: big.NewInt(n), b: big.NewInt(0), m: deckSize}
+	}
+	panic("bad instruction")
+}
+
+// convertInstrToLcf converts a slice of instructions in raw text form
+// into their lcf representations and returns a slice of lcfs
+func convertInstrToLcf(instructions []string, deckSize *big.Int) []lcf {
+	lcfs := make([]lcf, len(instructions))
+	for i, instr := range instructions {
+		lcfs[i] = instr2Lcf(instr, deckSize)
+	}
+	return lcfs
+}
+
+// compose a series of shuffle operations into a single lcf
+func compose(lcfs []lcf) lcf {
+	f := lcfs[0]
+	for i := 1; i < len(lcfs); i++ {
+		f = f.compose(lcfs[i])
+	}
+	return f
+}
+
+// powCompose composes a function f(x) into itself k times
+func powCompose(f lcf, k int64) lcf {
+	g := lcf{a: big.NewInt(1), b: big.NewInt(0), m: f.m}
+	for k > 0 {
+		if k%2 == 1 {
+			g = g.compose(f)
+		}
+		k /= 2
+		f = f.compose(f)
+	}
+	return g
+}
+
+func part1(instr []string) {
+	deckSize := big.NewInt(10007)
+	lcfs := convertInstrToLcf(instr, deckSize)
+	f := compose(lcfs) // f(x) represents a single shuffle of the deck
+	res := f.operate(big.NewInt(2019))
+	fmt.Println("[PART 1]: Card 2019 is at position", res)
+}
+
+func part2(instr []string) {
+	m := big.NewInt(119315717514047)    // deck size
+	lcfs := convertInstrToLcf(instr, m) // shuffle sequence
+	k := int64(101741582076661)         // no. of shuffles
+	f := compose(lcfs)                  // f(x) represents a single shuffle of the deck
+	f = powCompose(f, k)                // f(x) represents k shuffles of the deck
+
+	/* f(x) tells us where card x ends up after k shuffles. But the problem asks us which
+	card ends up in position 2020. Thus we need to invert f(x).
+	The inverse of f(x) must be a function F(x) such that x = aF(x) + b.
+	That is to say, F(x) is a function of x that performs the reverse operation of f(x).
+	After rearranging to isolate F(x):
+	        x - b
+	F(x) = ------- mod m
+	          a
+	*/
+	x := big.NewInt(2020)
+	numerator := big.NewInt(0)
+	numerator.Sub(x, f.b)
+	denominator := f.a
+
+	/*Division in modular arithmetic is done by first finding the modular multiplicative
+	inverse of the denominator, and then multiplying the numerator by that value.
+	       	p/q mod m = p・q^-1 mod m
+	*/
+	denominator.ModInverse(denominator, m) // modular multiplicative inverse of a = q^-1
+	numerator.Mul(numerator, denominator)  // p・q^-1
+	numerator.Mod(numerator, m)            // p・q^-1 mod m
+	fmt.Println("[PART 2]: The card at position", x, "ends up in position", numerator, "after", k, "shuffles.")
+}
+
+func main() {
+	instr := getInput("input.txt")
+	part1(instr)
+	part2(instr)
 }

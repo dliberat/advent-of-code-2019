@@ -31,8 +31,8 @@ Complete the calendar yourself, at [https://adventofcode.com/2019/](https://adve
 |19    | ★ ★     | Tractor Beam                           | 2D collisions.
 |20    | ★ ★     | Donut Maze                             | Maze solving. Breadth-first search. A* Search.
 |21    | ★ ★     | Springdroid Adventure                  | Boolean algebra.
-|22    | ★ ☆     | Slam Shuffle                           | Modular arithmetic.
+|22    | ★ ★     | Slam Shuffle                           | Modular arithmetic.
 |23    | ★ ★     | Category Six                           | Network packet routing (naive approach).
 |24    | ★ ★     | Planet of Discord                      | Conway's Game Of Life. Bitwise operations.
-|25    | ★ ☆     | Cryostasis                             | Trial-and-error (solved manually)
+|25    | ★ ★     | Cryostasis                             | Trial-and-error (solved manually)
 
